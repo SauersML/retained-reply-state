@@ -34,7 +34,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [14.5, 11.5, 11.0]                  # heights of the three rows
+ROWS = [14.5, 11.5, 11.0, 12.5]            # heights of the four rows
 H = sum(ROWS)
 
 
@@ -355,7 +355,7 @@ def row_head(cv, y0, flip_groups, npz):
     cv.S.text(11.6, top - 2.45, "each dot: one hidden animal; lines join the same animal", fontsize=18, color=SLATE, va="center")
     edited = all(saved_logp(npz, f"21:6*0|{q}")[0] is not None for q in ("retained", "recall_B", "neutral"))
     qs = [("retained", "\u201cWhich\nanimal did\nyou choose?\u201d"), ("recall_B", "\u201cRecall,\nintrospect, or\nreconstruct\u2026\u201d"),
-          ("neutral", "control:\n\u201cName any\nanimal\u201d")]
+          ("neutral", "control question:\n\u201cName any\nanimal\u201d")]
     ax = cv.axes(12.9, y0 + 2.6, 5.6, 5.9)
     panel_paired(ax, [(saved_logp(npz, f"none|{q}")[0], saved_logp(npz, f"21:6*0|{q}")[0] if edited else None,
                        saved_logp(npz, f"none|{q}")[1]) for q, _ in qs], (15, 102))
@@ -365,15 +365,18 @@ def row_head(cv, y0, flip_groups, npz):
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
 
     cv.letter(19.0, top - 0.75, "e")
-    cv.S.text(19.8, top - 0.75, "Janus's LLM explainer, put before\n\u201cWhich animal did you choose?\u201d,\nraises introspection",
+    cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the question:\nraises introspection in Qwen3-1.7B,\nlowers it in Qwen3-0.6B",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
-    qs = [("retained", "doc_A", "\u201cWhich\nanimal did\nyou choose?\u201d"), ("recall_B", "doc_B", "\u201cRecall,\nintrospect, or\nreconstruct\u2026\u201d"),
-          ("neutral", "doc_neutral", "control:\n\u201cName any\nanimal\u201d")]
-    ax = cv.axes(21.2, y0 + 2.6, 5.6, 5.9)
-    panel_paired(ax, [(saved_logp(npz, f"none|{q0}")[0], saved_logp(npz, f"none|{q1}")[0], saved_logp(npz, f"none|{q0}")[1])
-                      for q0, q1, _ in qs], (15, 102))
-    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for _, _, lab in qs], fontsize=18)
+    other = "results/q06A/q06A_questions.npz"
+    qs = [(npz, "retained", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"), (npz, "recall_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
+          (npz, "neutral", "doc_neutral", "1.7B, control:\n\u201cName any\nanimal\u201d"), (other, "retained", "doc_A", "0.6B:\n\u201cWhich\nanimal\u2026?\u201d")]
+    qs = [q for q in qs if saved_logp(q[0], f"none|{q[2]}")[0] is not None]
+    ax = cv.axes(20.9, y0 + 2.6, 6.1, 5.9)
+    panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{q1}")[0], saved_logp(sp, f"none|{q0}")[1])
+                      for sp, q0, q1, _ in qs], (15, 102))
+    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([30, 50, 70, 90])
     cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(27.15, y0 + 2.6, 0.2, 5.9))
@@ -423,71 +426,220 @@ def row_fourlayer(cv, refits, parts, y0):
     if not parts or not os.path.exists(parts):
         return
     cv.letter(13.4, top - 0.75, "g")
-    cv.S.text(14.2, top - 0.75, "the circuit, from removing single subcomponents: a few query and key\n"
-              "subcomponents route the word; many value and output subcomponents carry it", fontsize=25, weight="bold",
+    cv.S.text(14.2, top - 0.75, "Goodfire 4-layer model: the recall circuit, two attention\nsteps switched on and off by a few VPD subcomponents", fontsize=25, weight="bold",
               va="center", linespacing=1.15)
     g = json.load(open(parts))
     screen = os.path.join(os.path.dirname(parts), "subcomponent_circuit.json")
     if os.path.exists(screen):
         g["screen"] = json.load(open(screen))["single"]
-    draw_gates(cv.axes(14.0, y0 + 0.2, 13.8, 9.0), g)
+    import circuit_dot
+    img = circuit_dot.render(circuit_dot.gates_dot(g), "figs/circuit_gates")
+    key(cv, 14.2, top - 1.75)
+    image(cv, img, 13.6, top - 2.55, 14.3, 8.3)
+
+
+def row_graph(cv, path, y0):
+    """Panels h-i, occupying [y0, y0 + ROWS[3]]: stress tests of the 4-layer circuit (fourlayer/stress_circuit.py), and
+    the Qwen3-1.7B circuit of two layer-21 heads."""
+    import circuit_dot
+    top = y0 + ROWS[3]
+    if path and os.path.exists(path):
+        r = json.load(open(path))
+        cv.letter(0.1, top - 0.75, "h")
+        cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: stress tests of that circuit", fontsize=25, weight="bold", va="center")
+        ax = cv.axes(8.6, y0 + 1.6, 7.6, 8.6)
+        rows = [("unedited model", r["recall"], None, None),
+                ("block head 2.3 (copy step)", r["routes"]["copy step blocked"], None, None),
+                ("block heads 3.4, 3.5 (read step)", r["routes"]["read step blocked"], None, None),
+                ("block both steps", r["routes"]["circuit blocked"], None, None),
+                ("block every other head,\nkeep only the circuit", r["routes"]["only the circuit open"], None, None),
+                ("block every head", r["routes"]["every route blocked"], None, None),
+                ("remove the 5 subcomponents\nthat switch the circuit on", r["needed gates removed"]["recall"],
+                 r["needed gates removed"]["random"], [v["needed gates removed"] for v in r["frames"].values()]),
+                ("remove the 2 subcomponents\nthat hold it back", r["holding gates removed"]["recall"],
+                 r["holding gates removed"]["random"], [v["holding gates removed"] for v in r["frames"].values()])]
+        for i, (lab, v, rand, frames) in enumerate(rows):
+            y = -i
+            col = INK if i == 0 else (CORAL if v > r["recall"] + 0.005 else BLUE)
+            ax.barh(y, 100 * v - 50, left=50, height=0.6, color=col, zorder=2)
+            if abs(100 * v - 50) < 0.3:
+                ax.scatter([50], [y], s=120, marker="|", color=col, lw=3, zorder=3)
+                ax.text(50.4, y, "exactly chance", fontsize=15, color=SLATE, va="center")
+            if rand:
+                ax.scatter([100 * x for x in rand], [y] * len(rand), s=40, color=CLOUD, edgecolor=SLATE, lw=0.6, zorder=3)
+        ax.set_yticks([-i for i in range(len(rows))], [lab for lab, *_ in rows], fontsize=17)
+        ax.tick_params(axis="y", length=0)
+        ax.axvline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
+        ax.axvline(100 * r["recall"], color=INK, lw=1, ls=(0, (1, 2)))
+        ax.set_xlim(45, 72)
+        ax.set_xlabel("hidden word ranked above\nanother word (%)")
+        ax.spines["left"].set_visible(False)
+        ax.scatter([46.0], [-len(rows) + 0.15], s=40, color=CLOUD, edgecolor=SLATE, lw=0.6, clip_on=False)
+        ax.text(46.5, -len(rows) + 0.15, "random subcomponents instead (same number, matrices, positions)", fontsize=15,
+                color=SLATE, va="center")
+    cv.letter(17.0, top - 0.75, "i")
+    cv.S.text(17.8, top - 0.75, "Qwen3-1.7B: the circuit at the level of attention heads", fontsize=25, weight="bold", va="center")
+    image(cv, circuit_dot.render(circuit_dot.qwen_dot(), "figs/circuit_qwen"), 17.4, top - 1.8, 10.4, 9.0)
+
+
+def draw_circuit(ax, c, min_edge=0.2):
+    """Nodes: one subcomponent at one token position, placed by token (columns) and by layer and matrix (rows), sized by
+    how much recall changes when it is removed (blue: recall falls, coral: recall rises); links: removing the earlier
+    node lowers (blue) or raises (coral) the later node's activity, drawn when the change exceeds min_edge of its size."""
+    cols = {"frame": 1.0, "word": 5.0, "later": 10.0, "cue": 15.5}
+    names = {"frame": "frame  “My pet is a”", "word": "hidden word  “otter”",
+             "later": "later tokens  “. Nobody else knows.”", "cue": "cue  “My pet is a”"}
+    kinds = {"q_proj": ("query", 0), "k_proj": ("key", 0), "v_proj": ("value", 0), "o_proj": ("attention output", 1),
+             "c_fc": ("MLP in", 2), "down_proj": ("MLP out", 3)}
+
+    def place(node):
+        site, rest = node.split("#")
+        idx, cls = rest.split("@")
+        return cls, 4 * int(site.split(".")[1]) + kinds[site.split(".")[-1]][1], kinds[site.split(".")[-1]][0], idx
+
+    cells = {}
+    for n in c["circuit"]:
+        cls, row, _, _ = place(n)
+        cells.setdefault((cls, row), []).append(n)
+    xy = {}
+    for (cls, row), ns in cells.items():
+        for j, n in enumerate(sorted(ns)):
+            xy[n] = (cols[cls] + (j - (len(ns) - 1) / 2) * 1.55, row)
+    lost = {n: 100 * c["single"].get(n, 0.0) for n in c["circuit"]}
+    for e, v in sorted(c["edges"].items(), key=lambda kv: abs(kv[1])):
+        src, dst = e.split(" -> ")
+        if abs(v) < min_edge or src not in xy or dst not in xy:
+            continue
+        ax.annotate("", xy=xy[dst], xytext=xy[src], arrowprops=dict(arrowstyle="-|>", lw=0.8 + 3.0 * min(abs(v), 1.0),
+                    color=BLUE if v < 0 else CORAL, alpha=0.7, mutation_scale=14, shrinkA=9, shrinkB=9,
+                    connectionstyle="arc3,rad=0.12"), zorder=2)
+    for n, (x, y) in xy.items():
+        cls, row, kind, idx = place(n)
+        d = lost[n]
+        ax.scatter([x], [y], s=120 + 110 * abs(d), color=BLUE if d > 0 else CORAL, edgecolor="white", lw=1.5, zorder=4)
+        ax.text(x, y - 0.42, f"{kind} {idx}", ha="center", va="top", fontsize=13, color=INK, zorder=5)
+    for cls, x0 in cols.items():
+        ax.text(x0, -1.2, names[cls], ha="center", va="top", fontsize=17, color=SLATE)
+    for l in range(4):
+        ax.axhspan(4 * l - 0.6, 4 * l + 3.4, color="#f4f5f7" if l % 2 else "white", zorder=0)
+        ax.text(-0.6, 4 * l + 1.4, f"layer {l}", ha="right", va="center", fontsize=18, color=SLATE)
+        for lab, r in (("query / key / value", 0), ("attention output", 1), ("MLP in", 2), ("MLP out", 3)):
+            ax.text(18.3, 4 * l + r, lab, ha="left", va="center", fontsize=13, color=SLATE)
+    ax.scatter([20.6], [15.1], s=300, color=BLUE, edgecolor="white")
+    ax.text(20.9, 15.1, "removing it lowers recall", fontsize=16, color=BLUE, va="center")
+    ax.scatter([20.6], [14.3], s=300, color=CORAL, edgecolor="white")
+    ax.text(20.9, 14.3, "removing it raises recall", fontsize=16, color=CORAL, va="center")
+    ax.text(20.45, 13.5, "bigger dot: bigger change", fontsize=15, color=SLATE, va="center")
+    ax.annotate("", xy=(21.4, 12.6), xytext=(20.4, 12.6), arrowprops=dict(arrowstyle="-|>", lw=2.5, color=BLUE, mutation_scale=14))
+    ax.text(21.55, 12.6, "earlier node drives the later one", fontsize=15, color=BLUE, va="center")
+    ax.annotate("", xy=(21.4, 11.9), xytext=(20.4, 11.9), arrowprops=dict(arrowstyle="-|>", lw=2.5, color=CORAL, mutation_scale=14))
+    ax.text(21.55, 11.9, "earlier node suppresses the later one", fontsize=15, color=CORAL, va="center")
+    ax.set_xlim(-1.5, 26.4)
+    ax.set_ylim(-2.2, 15.8)
+    ax.axis("off")
+
+
+def key(cv, x, y):
+    """Visual key of the circuit diagrams: wire kinds and widths."""
+    S = cv.S
+    S.annotate("", xy=(x + 0.9, y), xytext=(x, y), arrowprops=dict(arrowstyle="-|>", lw=3.5, color=BLUE, mutation_scale=22))
+    S.text(x + 1.05, y, "needed for recall", fontsize=19, color=BLUE, va="center")
+    x2 = x + 4.1
+    S.plot([x2, x2 + 0.85], [y, y], color=CORAL, lw=3.5, solid_capstyle="butt")
+    S.plot([x2 + 0.85, x2 + 0.85], [y - 0.17, y + 0.17], color=CORAL, lw=4.5, solid_capstyle="butt")
+    S.text(x2 + 1.05, y, "holds recall back", fontsize=19, color=CORAL, va="center")
+    x3 = x2 + 4.1
+    S.plot([x3, x3 + 0.9], [y, y], color=CLOUD, lw=3, ls=(0, (4, 2)))
+    S.text(x3 + 1.05, y, "the word's information", fontsize=19, color=SLATE, va="center")
+    y2 = y - 0.6
+    S.annotate("", xy=(x + 0.9, y2), xytext=(x, y2), arrowprops=dict(arrowstyle="-|>", lw=1.5, color=BLUE, mutation_scale=16))
+    S.text(x + 1.05, y2, "small effect", fontsize=17, color=SLATE, va="center")
+    S.annotate("", xy=(x2 + 0.9, y2), xytext=(x2, y2), arrowprops=dict(arrowstyle="-|>", lw=6, color=BLUE, mutation_scale=26))
+    S.text(x2 + 1.05, y2, "large effect", fontsize=17, color=SLATE, va="center")
+
+
+def image(cv, img, x, top, w, h):
+    """The image scaled to fit w x h drawing units, its top at `top`, centered across w."""
+    ih, iw = img.shape[:2]
+    scale = min(w / iw, h / ih)
+    dw, dh = iw * scale, ih * scale
+    ax = cv.axes(x + (w - dw) / 2, top - dh, dw, dh)
+    ax.imshow(img, interpolation="lanczos")
+    ax.axis("off")
+    return ax
 
 
 def draw_gates(ax, g):
-    """The two attention steps of recall and the query/key subcomponents that gate them (fourlayer/attention_gates.py):
-    each gate's recall change when removed alone where it acts; blue: removing it lowers recall, coral: raises it."""
+    """The recall circuit of the 4-layer model as a wiring diagram.  Boxes: the parts, at the token positions where they
+    work; blue arrows: parts recall needs (removing one lowers recall), coral bars: parts that hold recall back (removing
+    one raises it); line width grows with that change (fourlayer/attention_gates.py and subcomponent_circuit.py)."""
     base = 100 * g["recall"]
-    def pick(prefix, n_sup, n_opp):
-        rows = [(k, 100 * v["recall"] - base) for k, v in g["gates"].items() if k.startswith(prefix)]
-        sup = sorted([r for r in rows if r[1] < 0], key=lambda r: r[1])[:n_sup]
-        opp = sorted([r for r in rows if r[1] > 0], key=lambda r: -r[1])[:n_opp]
-        return sup + opp
-    X, M, C = 1.2, 4.6, 8.4
-    for x0, w, lab in ((0.2, 2.0, "hidden word\n\u201cotter\u201d"), (3.0, 3.2, "later tokens\n\u201c. Nobody else knows.\u201d"),
-                       (7.2, 2.4, "cue\n\u201cMy pet is a\u201d")):
-        ax.add_patch(FancyBboxPatch((x0, 0.0), w, 1.0, boxstyle="round,pad=0,rounding_size=0.1", facecolor=PALE_SLATE, edgecolor="none"))
-        ax.text(x0 + w / 2, 0.5, lab, ha="center", va="center", fontsize=17, color=INK, linespacing=1.1)
-    ax.annotate("", xy=(10.3, 0.5), xytext=(9.65, 0.5), arrowprops=dict(arrowstyle="-|>", lw=2.5, color=INK, mutation_scale=22))
-    ax.text(10.4, 0.5, "hidden word's\nscore", ha="left", va="center", fontsize=17, color=INK)
-    ax.plot([X, C], [-0.35, -0.35], color=RED, lw=2, ls=(0, (3, 3)))
-    ax.text((X + C) / 2, -0.5, "the cue cannot attend to the hidden word", ha="center", va="top", fontsize=15, color=RED)
-    # step 1: layer 2 copies the word into the later tokens; step 2: layer 3 at the cue reads the later tokens
-    for (src, dst, y, title) in ((M, X, 3.3, "layer 2, head 2.3:\nthe later tokens copy the word"),
-                                 (C, M, 6.3, "layer 3, heads 3.4 and 3.5:\nthe cue reads the later tokens")):
-        ax.plot([src, src], [1.05, y], color=CLOUD, lw=1.5, ls=(0, (2, 2)), zorder=1)
-        ax.plot([dst, dst], [1.05, y], color=CLOUD, lw=1.5, ls=(0, (2, 2)), zorder=1)
-        ax.annotate("", xy=(dst, y), xytext=(src, y), arrowprops=dict(arrowstyle="-|>", lw=5, color=BLUE,
-                    connectionstyle="arc3,rad=0.3", mutation_scale=30), zorder=3)
-        ax.text((src + dst) / 2, y + 0.55 + 0.3 * abs(src - dst) / 3.8, title, ha="center", va="bottom", fontsize=18,
-                color=BLUE, weight="bold", linespacing=1.1)
-    names = {"q_proj": "query", "k_proj": "key"}
-    def gate(x, y, key, d):
-        site, rest = key.split("#")
+    eff = {k: 100 * v["recall"] - base for k, v in g["gates"].items()}
+    eff.update({k: -100 * v for k, v in g.get("screen", {}).items()})
+    E = lambda *keys: float(np.mean([eff[k] for k in keys if k in eff]))
+    width = lambda d: 1.5 + 0.9 * abs(d)
+
+    def box(x, y, w, h, text, face, edge, color=INK, size=16, weight="normal"):
+        ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h, boxstyle="round,pad=0,rounding_size=0.12",
+                                    facecolor=face, edgecolor=edge, lw=2, zorder=3))
+        ax.text(x, y, text, ha="center", va="center", fontsize=size, color=color, weight=weight, zorder=4, linespacing=1.1)
+
+    def wire(p0, p1, d, rad=0.0):
         col = BLUE if d < 0 else CORAL
-        ax.scatter([x], [y], s=110 + 220 * abs(d), color=col, edgecolor="white", lw=1.5, zorder=4)
-        ax.text(x + 0.3, y, f"{names[site.split('.')[-1]]} {rest.split('@')[0]}  {d:+.1f}", ha="left", va="center", fontsize=16, color=col)
-    for j, (k, d) in enumerate(pick("h.2.attn.k_proj", 2, 0)):
-        gate(0.45, 2.3 - 0.5 * j, k, d)
-    for j, (k, d) in enumerate(pick("h.2.attn.q_proj", 2, 1)):
-        gate(3.35, 2.45 - 0.48 * j, k, d)
-    for j, (k, d) in enumerate(pick("h.3.attn.q_proj", 1, 2)):
-        gate(7.45, 5.1 - 0.52 * j, k, d)
-    ax.text(0.45, 2.75, "keys at the word", fontsize=15, color=SLATE)
-    ax.text(3.35, 2.9, "queries at the later tokens", fontsize=15, color=SLATE)
-    ax.text(7.45, 5.55, "queries at the cue", fontsize=15, color=SLATE)
-    # nodes of the full removal screen on the same path (fourlayer/subcomponent_circuit.py, all 48 templates)
-    extra = [(5.15, 5.0, "h.3.attn.k_proj#145@later", "layer-3 key"),
-             (5.15, 4.3, "h.2.attn.o_proj#735@later", "layer-2 output"),
-             (7.45, 3.25, "h.3.attn.o_proj#806@cue", "layer-3 output")]
-    for x, y, key, lab in extra:
-        d = -100 * g.get("screen", {}).get(key, 0.0)
-        if d:
-            ax.scatter([x], [y], s=110 + 220 * abs(d), color=BLUE, edgecolor="white", lw=1.5, zorder=4)
-            ax.text(x + 0.3, y, f"{key.split('#')[1].split('@')[0]}  {d:+.1f}", ha="left", va="center", fontsize=16, color=BLUE)
-            ax.text(x + 0.3, y + 0.32, lab, ha="left", va="center", fontsize=13, color=SLATE)
-    ax.text(0.2, 8.6, "number: recall change (points) when that one subcomponent is removed where it acts", fontsize=16, color=SLATE)
-    ax.set_xlim(0, 12.6)
-    ax.set_ylim(-1.0, 8.9)
+        style = "-|>" if d < 0 else "-["
+        ax.annotate("", xy=p1, xytext=p0, arrowprops=dict(arrowstyle=style, lw=width(d), color=col, mutation_scale=18,
+                    shrinkA=2, shrinkB=2, connectionstyle=f"arc3,rad={rad}"), zorder=2)
+
+    def content(p0, p1, rad=0.0):
+        ax.annotate("", xy=p1, xytext=p0, arrowprops=dict(arrowstyle="-|>", lw=3, color=CLOUD, mutation_scale=18,
+                    shrinkA=2, shrinkB=2, connectionstyle=f"arc3,rad={rad}", ls=(0, (4, 2))), zorder=1)
+
+    A, B, C = 1.3, 5.2, 9.3                                   # columns: hidden word, later tokens, cue
+    box(A, 0.55, 2.3, 0.9, "hidden word\n\u201cotter\u201d", PALE_SLATE, "none", size=16)
+    box(B, 0.55, 3.2, 0.9, "later tokens\n\u201c. Nobody else knows.\u201d", PALE_SLATE, "none", size=16)
+    box(C, 0.55, 2.6, 0.9, "cue\n\u201cMy pet is a\u201d", PALE_SLATE, "none", size=16)
+    box(12.05, 7.45, 1.5, 0.9, "answer:\n\u201cotter\u201d", PALE_SLATE, "none", size=16, weight="bold")
+    ax.plot([A, C], [-0.2, -0.2], color=RED, lw=2, ls=(0, (3, 3)))
+    ax.text((A + C) / 2, -0.35, "the cue cannot look at the hidden word directly", ha="center", va="top", fontsize=15, color=RED)
+
+    # step 1, layer 2: the later tokens copy the word
+    box(A, 2.25, 2.3, 0.75, "keys 224, 206", "white", BLUE, BLUE)
+    box(B, 2.25, 2.3, 0.75, "query 436", "white", BLUE, BLUE)
+    box(3.25, 3.75, 3.1, 0.95, "head 2.3 (layer 2)\ncopies the word", PALE_BLUE, BLUE, size=17, weight="bold")
+    box(B + 0.6, 5.0, 2.1, 0.75, "output 735", "white", BLUE, BLUE)
+    content((A, 1.0), (A, 1.85)); content((B, 1.0), (B, 1.85))
+    wire((A + 0.4, 2.65), (2.6, 3.27), E("h.2.attn.k_proj#224@word", "h.2.attn.k_proj#206@word"))
+    wire((B - 0.4, 2.65), (3.9, 3.27), E("h.2.attn.q_proj#436@later"))
+    content((A - 0.6, 1.0), (2.1, 3.3), rad=-0.25)
+    ax.text(0.05, 3.1, "the word's identity\n(many value parts)", fontsize=13, color=SLATE, ha="left")
+    wire((4.3, 4.22), (B + 0.1, 4.62), E("h.2.attn.o_proj#735@later"))
+
+    # step 2, layer 3: the cue reads the later tokens
+    box(B - 0.4, 6.2, 2.0, 0.75, "key 145", "white", BLUE, BLUE)
+    box(C - 0.55, 5.0, 1.9, 0.75, "query 182", "white", BLUE, BLUE)
+    box(C + 1.3, 5.0, 2.1, 0.75, "queries 334, 60", "white", CORAL, CORAL)
+    box(8.0, 7.45, 3.6, 0.95, "heads 3.4, 3.5 (layer 3)\nread the later tokens", PALE_BLUE, BLUE, size=17, weight="bold")
+    content((C - 0.55, 1.0), (C - 0.55, 4.6)); content((C + 1.3, 1.0), (C + 1.3, 4.6))
+    content((B + 0.6, 5.38), (B - 0.1, 5.82))
+    wire((B - 0.4, 6.58), (6.6, 7.0), E("h.3.attn.k_proj#145@later"))
+    wire((C - 0.55, 5.38), (8.3, 6.97), E("h.3.attn.q_proj#182@cue"))
+    wire((C + 1.3, 5.38), (9.35, 6.97), E("h.3.attn.q_proj#334@cue", "h.3.attn.q_proj#60@cue"))
+    content((B + 1.3, 5.38), (6.9, 6.97), rad=0.15)
+    box(10.15, 8.65, 2.1, 0.7, "output 806", "white", BLUE, BLUE)
+    wire((9.4, 7.93), (9.9, 8.3), E("h.3.attn.o_proj#806@cue"))
+    wire((11.2, 8.5), (11.9, 7.92), -2.0)
+
+    # legend
+    ax.annotate("", xy=(1.0, 9.55), xytext=(0.2, 9.55), arrowprops=dict(arrowstyle="-|>", lw=3, color=BLUE, mutation_scale=18))
+    ax.text(1.15, 9.55, "needed for recall", fontsize=16, color=BLUE, va="center")
+    ax.annotate("", xy=(4.4, 9.55), xytext=(3.6, 9.55), arrowprops=dict(arrowstyle="-[", lw=3, color=CORAL, mutation_scale=18))
+    ax.text(4.55, 9.55, "holds recall back", fontsize=16, color=CORAL, va="center")
+    ax.plot([6.9, 7.7], [9.55, 9.55], color=CLOUD, lw=3, ls=(0, (4, 2)))
+    ax.text(7.85, 9.55, "the word's information", fontsize=16, color=SLATE, va="center")
+    ax.text(0.2, 9.0, "thicker line: removing that part changes recall more.  Parts are VPD subcomponents, named by number.",
+            fontsize=14, color=SLATE, va="center")
+    ax.set_xlim(-0.1, 12.9)
+    ax.set_ylim(-0.9, 9.9)
     ax.axis("off")
 
 
@@ -500,15 +652,15 @@ def main():
     ap.add_argument("--questions", required=True, help="edit_heads.py --save-logp outputs (.npz, sets joined with +) for d and e")
     ap.add_argument("--refit", nargs="+", required=True, help="fourlayer/optimize_edit.py --support outputs")
     ap.add_argument("--parts", default=None, help="fourlayer/attention_gates.py output")
+    ap.add_argument("--graph", default=None, help="fourlayer/stress_circuit.py output")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
-    row_experiment(cv, a.results, ROWS[1] + ROWS[2], a.text4l)
-    row_head(cv, ROWS[2], json.load(open(a.flip)), a.questions)
-    row_fourlayer(cv, a.refit, a.parts, 0)
-    for y in (ROWS[2] + ROWS[1], ROWS[2]):
-        cv.S.plot([0.3, W - 0.3], [y, y], color="#e3e5e8", lw=2)
+    row_experiment(cv, a.results, ROWS[1] + ROWS[2] + ROWS[3], a.text4l)
+    row_head(cv, ROWS[2] + ROWS[3], json.load(open(a.flip)), a.questions)
+    row_fourlayer(cv, a.refit, a.parts, ROWS[3])
+    row_graph(cv, a.graph, 0)
     fig.savefig(a.out, dpi=100)
 
 

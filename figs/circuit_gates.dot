@@ -1,0 +1,64 @@
+digraph G {
+  rankdir=LR; splines=spline; nodesep=0.3; ranksep=0.45; bgcolor="white"; pad=0.1;
+  node [shape=box, fontname="Avenir Next", fontsize=30, margin="0.18,0.1"];
+  edge [fontname="Avenir Next", fontsize=26, fontcolor="#8e959c"];
+  { rank=same; word [label="hidden word
+“otter”", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"]; later [label="later tokens
+“. Nobody else knows.”", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"];
+    cue [label="cue
+“My pet is a”", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"]; }
+  { rank=same; k2 [label="layer 2 keys
+at the hidden word
+(2 subcomponents)", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
+    q2 [label="layer 2 query
+at the later tokens", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2]; }
+  h2 [label="layer 2, head 3
+copies the word
+into the later tokens", style="rounded,filled,bold", fillcolor="#dce8f6", color="#2f6db5", fontcolor="#1d1d1f", fontsize=33, penwidth=2.6];
+  o2 [label="layer 2 attention output
+at the later tokens", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
+  { rank=same; k3 [label="layer 3 key
+at the later tokens", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
+    q3 [label="layer 3 query
+at the cue", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
+    b3 [label="layer 3 queries
+at the cue
+(2 subcomponents)", color="#e8684a", fontcolor="#e8684a", style="rounded,filled", fillcolor="white", penwidth=2.2]; }
+  h3 [label="layer 3, heads 4 and 5
+read the later tokens
+at the cue", style="rounded,filled,bold", fillcolor="#dce8f6", color="#2f6db5", fontcolor="#1d1d1f", fontsize=33, penwidth=2.6];
+  o3 [label="layer 3 attention output
+at the cue", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
+  answer [label="answer:
+“otter”", style="rounded,filled,bold", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f", fontsize=33];
+  word -> k2 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9]; later -> q2 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9]; cue -> q3 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9]; cue -> b3 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  word -> h2 [color="#b9bfc6", penwidth=0.9, arrowsize=0.8, label="78 value\nsubcomponents", fontcolor="#8e959c"];
+  k2 -> h2 [color="#2f6db5", penwidth=4.81, arrowhead=normal, arrowsize=1.1];
+  q2 -> h2 [color="#2f6db5", penwidth=3.48, arrowhead=normal, arrowsize=1.1];
+  h2 -> o2 [color="#2f6db5", penwidth=4.66, arrowhead=normal, arrowsize=1.1];
+  o2 -> k3 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowhead=none];
+  o2 -> h3 [color="#b9bfc6", penwidth=0.9, arrowsize=0.8, label="many value\nsubcomponents", fontcolor="#8e959c"];
+  k3 -> h3 [color="#2f6db5", penwidth=5.22, arrowhead=normal, arrowsize=1.1];
+  q3 -> h3 [color="#2f6db5", penwidth=2.38, arrowhead=normal, arrowsize=1.1];
+  b3 -> h3 [color="#e8684a", penwidth=6.14, arrowhead=tee, arrowsize=1.4];
+  h3 -> o3 [color="#2f6db5", penwidth=3.42, arrowhead=normal, arrowsize=1.1];
+  o3 -> answer [color="#2f6db5", penwidth=3.40, arrowhead=normal, arrowsize=1.1];
+}

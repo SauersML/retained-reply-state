@@ -1,0 +1,72 @@
+{
+ "recall": 0.5990731292517006,
+ "routes": {
+  "circuit blocked": 0.5320493197278912,
+  "copy step blocked": 0.551641156462585,
+  "read step blocked": 0.5311564625850341,
+  "only the circuit open": 0.5601360544217687,
+  "every route blocked": 0.49999999999999994
+ },
+ "needed gates removed": {
+  "recall": 0.5272874149659865,
+  "random": [
+   0.6013010204081632,
+   0.5996768707482993,
+   0.5993537414965986,
+   0.6010884353741496,
+   0.5999574829931973,
+   0.5995918367346939,
+   0.6001105442176872,
+   0.5984013605442177
+  ]
+ },
+ "holding gates removed": {
+  "recall": 0.6981802721088437,
+  "random": [
+   0.6003741496598639,
+   0.599625850340136,
+   0.5997874149659864,
+   0.5992346938775511,
+   0.5992176870748299,
+   0.5984098639455783,
+   0.599625850340136,
+   0.5996683673469387
+  ]
+ },
+ "frames": {
+  "My pet is a": {
+   "recall": 0.7447448979591836,
+   "needed gates removed": 0.5588775510204081,
+   "holding gates removed": 0.8935204081632654
+  },
+  "The animal in the box is a": {
+   "recall": 0.762295918367347,
+   "needed gates removed": 0.5610714285714286,
+   "holding gates removed": 0.8933673469387755
+  },
+  "In the picture there is a": {
+   "recall": 0.7642346938775509,
+   "needed gates removed": 0.6,
+   "holding gates removed": 0.9006122448979592
+  },
+  "Her favourite animal is the": {
+   "recall": 0.8103061224489795,
+   "needed gates removed": 0.6519387755102041,
+   "holding gates removed": 0.9110714285714286
+  },
+  "The word on the card was": {
+   "recall": 0.7538775510204081,
+   "needed gates removed": 0.5904081632653061,
+   "holding gates removed": 0.8742857142857143
+  },
+  "Behind the barn we found a": {
+   "recall": 0.7283163265306123,
+   "needed gates removed": 0.5706122448979591,
+   "holding gates removed": 0.8820408163265305
+  }
+ },
+ "mediation": {
+  "corr_attention_recall": 0.9364344528270746,
+  "n": 160
+ }
+}

@@ -40,6 +40,7 @@ def main():
     ap.add_argument("--screen", type=int, default=12, help="templates used to screen candidates")
     ap.add_argument("--confirm", type=int, default=60, help="candidates measured again on all templates")
     ap.add_argument("--rest", type=float, default=0.02, help="joint removal must leave recall within this of chance")
+    ap.add_argument("--nodes", default="", help="JSON list of nodes site#idx@class: skip the screen, measure these")
     ap.add_argument("--out", default=os.path.join(RESULTS, "subcomponent_circuit.json"))
     a = ap.parse_args()
     torch.set_grad_enabled(False)
@@ -102,42 +103,53 @@ def main():
         L_ = np.concatenate([torch.log_softmax(forward(s, p, m, removed), -1)[:, animal_ids].numpy() for s, p, m in temps])
         return float(accuracy(L_, np.tile(np.arange(len(ANIMALS)), len(temps))))
 
-    # 1. candidates from the causal-importance network
-    ci_sum = {}
-    for seq, pos, _ in templates:
-        _, ci = vpd.target_and_ci(seq)
-        for site, c in ci.items():                                   # c: [B, T, C]
-            for cls in CLASSES:
-                ci_sum.setdefault((site, cls), torch.zeros(c.shape[-1]))
-                ci_sum[(site, cls)] += c[:, pos[cls]].mean((0, 1)) / len(templates)
-    cands = [(site, int(i), cls) for (site, cls), m in ci_sum.items() for i in torch.nonzero(m > a.ci).flatten().tolist()]
-    print(f"{len(cands)} candidate nodes (mean importance > {a.ci})", flush=True)
+    base = recall(templates)
+    if a.nodes:                                                  # given nodes: their single losses and the edges between them
+        parse = lambda k: (k.split("#")[0], int(k.split("#")[1].split("@")[0]), k.split("@")[1])
+        circuit = [parse(k) for k in json.load(open(a.nodes))]
+        confirmed = {n: base - recall(templates, [n]) for n in circuit}
+        single, cands, top, joint, random_sets = dict(confirmed), circuit, circuit, [recall(templates, circuit)], []
+        print(f"{len(circuit)} given nodes removed together: recall {100 * joint[0]:.1f}%", flush=True)
+    else:
+        circuit = None
 
-    base_screen, base = recall(screen), recall(templates)
-    print(f"recall: screening templates {100 * base_screen:.1f}%, all {100 * base:.1f}%", flush=True)
-    single = {}
-    for j, node in enumerate(cands):
-        single[node] = base_screen - recall(screen, [node])
-        if j % 200 == 0:
-            print(f"  screened {j}/{len(cands)}", flush=True)
-    top = sorted(cands, key=lambda n: -single[n])[:a.confirm]
-    confirmed = {n: base - recall(templates, [n]) for n in top}
-    ranked = sorted(top, key=lambda n: -confirmed[n])
-    for n in ranked[:20]:
-        print(f"  {n[0]}#{n[1]} at {n[2]}: recall lost {100 * confirmed[n]:.1f} points", flush=True)
+    if circuit is None:
+        # 1. candidates from the causal-importance network
+        ci_sum = {}
+        for seq, pos, _ in templates:
+            _, ci = vpd.target_and_ci(seq)
+            for site, c in ci.items():                                   # c: [B, T, C]
+                for cls in CLASSES:
+                    ci_sum.setdefault((site, cls), torch.zeros(c.shape[-1]))
+                    ci_sum[(site, cls)] += c[:, pos[cls]].mean((0, 1)) / len(templates)
+        cands = [(site, int(i), cls) for (site, cls), m in ci_sum.items() for i in torch.nonzero(m > a.ci).flatten().tolist()]
+        print(f"{len(cands)} candidate nodes (mean importance > {a.ci})", flush=True)
 
-    # 3. the smallest set, in order of single losses, whose joint removal reaches chance
-    circuit, joint = [], []
-    for n in ranked:
-        circuit.append(n)
-        r = recall(templates, circuit)
-        joint.append(r)
-        print(f"  first {len(circuit)} removed together: recall {100 * r:.1f}%", flush=True)
-        if r - 0.5 <= a.rest:
-            break
-    random_sets = [recall(templates, [cands[i] for i in rng.choice(len(cands), len(circuit), replace=False)]) for _ in range(5)]
-    print(f"circuit of {len(circuit)} nodes: removed together {100 * joint[-1]:.1f}%; random sets of {len(circuit)}: "
-          + ", ".join(f"{100 * r:.1f}%" for r in random_sets), flush=True)
+        base_screen, base = recall(screen), recall(templates)
+        print(f"recall: screening templates {100 * base_screen:.1f}%, all {100 * base:.1f}%", flush=True)
+        single = {}
+        for j, node in enumerate(cands):
+            single[node] = base_screen - recall(screen, [node])
+            if j % 200 == 0:
+                print(f"  screened {j}/{len(cands)}", flush=True)
+        top = sorted(cands, key=lambda n: -single[n])[:a.confirm]
+        confirmed = {n: base - recall(templates, [n]) for n in top}
+        ranked = sorted(top, key=lambda n: -confirmed[n])
+        for n in ranked[:20]:
+            print(f"  {n[0]}#{n[1]} at {n[2]}: recall lost {100 * confirmed[n]:.1f} points", flush=True)
+
+        # 3. the smallest set, in order of single losses, whose joint removal reaches chance
+        circuit, joint = [], []
+        for n in ranked:
+            circuit.append(n)
+            r = recall(templates, circuit)
+            joint.append(r)
+            print(f"  first {len(circuit)} removed together: recall {100 * r:.1f}%", flush=True)
+            if r - 0.5 <= a.rest:
+                break
+        random_sets = [recall(templates, [cands[i] for i in rng.choice(len(cands), len(circuit), replace=False)]) for _ in range(5)]
+        print(f"circuit of {len(circuit)} nodes: removed together {100 * joint[-1]:.1f}%; random sets of {len(circuit)}: "
+              + ", ".join(f"{100 * r:.1f}%" for r in random_sets), flush=True)
 
     # 4. edges: remove each circuit node, measure every later circuit node's activity
     layer = lambda n: int(n[0].split(".")[1])
