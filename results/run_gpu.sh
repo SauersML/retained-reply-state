@@ -19,9 +19,9 @@ NL=$(python3 -c "from transformers import AutoConfig; print(AutoConfig.from_pret
     --batch "$B" --device cuda --out "$O/${T}_localize_discovery.json"; touch "$O/${T}_localize_discovery.json.done"; }
 G=$(python3 select_heads.py "$O/${T}_localize_discovery.json"); echo "$G" > "$O/${T}_heads.txt"
 P=${G%;*}; S=${G#*;}
-GROUPS="all"; [ -n "$P" ] && GROUPS="$P;$GROUPS"; [ -n "$S" ] && GROUPS="$S;$GROUPS"; [ -n "$P" ] && [ -n "$S" ] && GROUPS="$P,$S;$GROUPS"
-python3 localize.py "$C" --band 4 --batch "$B" --device cuda --only layers,token --out "$O/${T}_localize_confirmation.json"
-python3 dose.py "$C" --groups "$GROUPS" --doses=-2,-1,0,0.5,1,2,4,8 --batch "$B" --device cuda --out "$O/${T}_dose.json"
+HG="all"; [ -n "$P" ] && HG="$P;$HG"; [ -n "$S" ] && HG="$S;$HG"; [ -n "$P" ] && [ -n "$S" ] && HG="$P,$S;$HG"
+[ -s "$O/${T}_localize_confirmation.json" ] || python3 localize.py "$C" --band 4 --batch "$B" --device cuda --only layers,token --out "$O/${T}_localize_confirmation.json"
+python3 dose.py "$C" --groups "$HG" --doses=-2,-1,0,0.5,1,2,4,8 --batch "$B" --device cuda --out "$O/${T}_dose.json"
 NEC="all"; [ -n "$P" ] && NEC="$P"; [ -n "$S" ] && NEC="$NEC;$S"
 python3 dose.py "$C" --groups "$NEC" --base retained --doses=0,1 --batch "$B" --device cuda --out "$O/${T}_necessity.json"
 H=$(echo "$P,$S" | sed 's/^,//; s/,$//')
