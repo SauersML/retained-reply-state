@@ -5,10 +5,11 @@
   c-e  Qwen3-1.7B: switching off layer 21, head 6 (its output weights set to zero) on several datasets, with other
        heads switched off as controls (edit_heads.py); each turn-2 question with and without the head; the head's
        attention on the reply while answering, under each recall question (attention.py)
-  f    Goodfire's 4-layer model: the cheapest weight edits of its VPD subcomponents against damage on Pile text
-       (fourlayer/edit_eval.py, fourlayer/optimize_edit.py)
+  f    Goodfire's 4-layer model: weight edits built from its VPD subcomponents, hand-picked and fitted, on held-out
+       templates against damage on held-out Pile text (fourlayer/optimize_edit.py)
+  g    Qwen3-1.7B: each wording of the recall question over the same caches (edit_heads.py --question)
 usage: figure_main.py --results R.json ... --text4l T.json --flip figs/flip_rows.json --questions figs/questions.json
-       --attention A1.json A2.json A3.json A4.json --sweep S.json [--optimized O.json]
+       --attention A1.json A2.json A3.json A4.json --optimized O.json [--words W.json]
 """
 import argparse
 import json
@@ -346,42 +347,41 @@ def panel_words(cv, x, y, w, h, path):
     ax.set_xlabel("hidden animal ranked above another animal (%)", fontsize=22)
 
 
-def row_fourlayer(cv, sweep_paths, optimized, words, y0):
-    """Panel f, occupying [y0, y0 + ROWS[2]]: the cheapest VPD-subcomponent weight edits of Goodfire's 4-layer model."""
+def row_fourlayer(cv, optimized, words, y0):
+    """Panels f-g, occupying [y0, y0 + ROWS[2]].  f: weight edits of Goodfire's 4-layer model built from its VPD
+    subcomponents, on held-out templates against KL on held-out Pile text (fourlayer/optimize_edit.py): hand-picked
+    subcomponents, and scales fitted over all subcomponents of layers 1-3 on the other templates."""
     top = y0 + ROWS[2]
+    d = json.load(open(optimized))
+    base = 100 * d["unedited"]["discrimination"]
     cv.letter(0.1, top - 0.75, "f")
-    cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: the cheapest weight edits that raise\nrecall, built from its VPD subcomponents (rank-one parts\nof the weights)",
+    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: editing its VPD subcomponents\n(rank-one parts of the weights) raises recall from {base:.0f}%\n"
+              f"to {100 * d['best_at_kl_0.02']['optimized']['discrimination']:.0f}% on held-out templates, at small cost",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(2.4, y0 + 1.6, 8.6, 6.9)
     names = {"h.3.attn.q_proj#334": "query #334", "h.2.attn.k_proj#224": "key #224", "h.1.mlp.down_proj#1320": "MLP out #1320"}
-    word = lambda f: {"0": "removed", "0.5": "halved", "2": "doubled", "4": "×4", "8": "×8"}.get(f, f"×{f}")
-    pts = []
-    for path in sweep_paths:
-        for spec, r in json.load(open(path)).items():
-            if "discrimination" in r and r["pile_kl"] <= 0.1:
-                lab = "unedited" if spec == "unedited" else ",\n".join(f"{names[p.split(':')[0]]} {word(p.split(':')[1])}"
-                                                                       for p in spec.split(","))
-                pts.append((r["pile_kl"], 100 * r["discrimination"], lab))
-    pts.sort()
-    best, front = -1, []
-    for kl, d, lab in pts:
-        if d > best:
-            best, front = d, front + [(kl, d, lab)]
-    ax.plot([p[0] for p in front], [p[1] for p in front], "-o", color=BLUE, lw=3.5, ms=12, zorder=3,
-            label="hand-picked subcomponents")
-    for kl, d, lab in front:
-        ax.annotate(lab, (kl, d), xytext=(10, -6), textcoords="offset points", fontsize=17, color=INK if lab == "unedited" else BLUE,
-                    va="top")
-    if optimized:
-        o = json.load(open(optimized))["frontier"]
-        o = sorted((r["kl"], 100 * r["discrimination"]) for r in o if r["kl"] <= 0.1)
-        ax.plot([p[0] for p in o], [p[1] for p in o], "-s", color=INK, lw=3.5, ms=11, zorder=3,
-                label="all subcomponents, fitted on other templates")
-        ax.legend(frameon=False, fontsize=18, loc="lower right")
+    word = lambda f: {"0": "removed", "0.5": "halved", "2": "doubled", "4": "\u00d74", "8": "\u00d78"}.get(f, f"\u00d7{f}")
+    hand = [(0.0, base, "")] + [(r["kl"], 100 * r["discrimination"], ", ".join(
+        f"{names[q.split(':')[0]]} {word(q.split(':')[1])}" for q in r["edit"].split(","))) for r in d["hand_picked_frontier"]]
+    hand = [h for h in hand if h[0] <= 0.06]
+    ax.plot([h[0] for h in hand], [h[1] for h in hand], "-o", color=SLATE, lw=3, ms=10, zorder=3)
+    for kl, v, lab in hand[1:]:
+        ax.annotate(lab, (kl, v), xytext=(8, -8), textcoords="offset points", fontsize=16, color=SLATE, va="top")
+    opt = sorted((r["kl"], 100 * r["discrimination"]) for r in d["frontier"] if r["kl"] <= 0.06)
+    ax.plot([0.0] + [o[0] for o in opt], [base] + [o[1] for o in opt], "-o", color=BLUE, lw=3.5, ms=11, zorder=4)
+    ax.text(0.022, 89, "scales fitted over all 9,728\nsubcomponents, on other templates", color=BLUE, fontsize=18, va="center")
+    ax.text(0.031, 61, "hand-picked subcomponents", color=SLATE, fontsize=18, va="center")
+    sparse = next(o for o in d["optimized"] if len(o["scales"]) == 186 and o.get("top_k"))
+    m = sparse["metrics"]
+    ax.scatter([m["pile_kl"]], [100 * m["discrimination"]], s=220, facecolor="white", edgecolor=BLUE, lw=3, zorder=5)
+    ax.annotate("only 186 subcomponents", (m["pile_kl"], 100 * m["discrimination"]), xytext=(14, -14), textcoords="offset points",
+                fontsize=17, color=BLUE, va="top")
+    ax.scatter([0], [base], s=200, color=INK, zorder=6)
+    ax.annotate("unedited", (0, base), xytext=(10, -22), textcoords="offset points", fontsize=17, color=INK)
     ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
-    ax.set_xlim(-0.003, 0.1)
-    ax.set_ylim(48, 75)
-    ax.set_xlabel("damage to the model on ordinary Pile text (KL, nats per token)")
+    ax.set_xlim(-0.002, 0.06)
+    ax.set_ylim(48, 102)
+    ax.set_xlabel("damage to the model on held-out Pile text (KL, nats per token)")
     ax.set_ylabel("hidden word ranked above\nanother word (%)")
     if words:
         cv.letter(13.6, top - 0.75, "g")
@@ -398,8 +398,7 @@ def main():
     ap.add_argument("--flip", required=True, help="JSON: groups of lines for panel c (see panel_switch)")
     ap.add_argument("--questions", required=True, help="JSON: the questions of panel d (see panel_questions)")
     ap.add_argument("--attention", nargs=4, required=True, help="attention.py outputs, both turn-1 by both recall wordings")
-    ap.add_argument("--sweep", nargs="+", required=True, help="fourlayer/edit_eval.py outputs")
-    ap.add_argument("--optimized", default=None, help="fourlayer/optimize_edit.py output, if there is one")
+    ap.add_argument("--optimized", required=True, help="fourlayer/optimize_edit.py output")
     ap.add_argument("--words", default=None, help="edit_heads.py --question output: recall questions differing in their request")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
@@ -407,7 +406,7 @@ def main():
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1] + ROWS[2], a.text4l)
     row_head(cv, ROWS[2], json.load(open(a.flip)), json.load(open(a.questions)), a.attention)
-    row_fourlayer(cv, a.sweep, a.optimized, a.words, 0)
+    row_fourlayer(cv, a.optimized, a.words, 0)
     for y in (ROWS[2] + ROWS[1], ROWS[2]):
         cv.S.plot([0.3, W - 0.3], [y, y], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=100)
