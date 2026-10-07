@@ -10,3 +10,6 @@ results/q17A/validate_done
 results/q17A/rerun_done
 results/q17A/night_done
 results/weights_scipy_done
+*_turn1.jsonl
+results/q17A/rerun2_done
+results/q17A/free_done

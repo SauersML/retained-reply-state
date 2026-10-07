@@ -17,6 +17,7 @@ Also saved: the residual stream at the reply's last text token for every layer (
 """
 import argparse
 import json
+import os
 import re
 import time
 
@@ -134,7 +135,11 @@ def main():
         suffix[name] = full[P + R:] + answer
     forms = [(c, tok.encode(f, add_special_tokens=False)) for c in NAMES for f in (" " + c.title(), " " + c)]
 
-    runs = []
+    # turn 1 is saved batch by batch, so a killed run resumes where it stopped (the draws of finished batches are replayed)
+    ckpt = a.out.replace(".json", "_turn1.jsonl")
+    done = [json.loads(line) for line in open(ckpt)] if os.path.exists(ckpt) else []
+    runs = [r for b in done for r in b["runs"]]
+    finished = {b["s0"] for b in done}
     with torch.no_grad():
         t0 = time.time()
         for s0 in range(0, a.n, a.batch):
@@ -142,6 +147,9 @@ def main():
             chosen = [NAMES[k] for k in rng.integers(0, len(NAMES), B)]
             starts = ["<think>\n"] * B if a.choice == "free" else [f"<think>\n{OPEN[rng.integers(len(OPEN))].format(sg=ITEMS[a.items][2])} Draw #{rng.integers(100, 1000)}: {c}. "
                       f"{CLOSE[rng.integers(len(CLOSE))]} I'll keep {c} in mind." for c in chosen]
+            if s0 in finished:
+                continue
+            new = []
             seqs = [prompt + tok.encode(s, add_special_tokens=False) for s in starts]
             W = max(map(len, seqs))
             pad = tok.pad_token_id
@@ -161,8 +169,13 @@ def main():
                         if named is None:
                             continue
                         chosen[j] = named
-                    runs.append({"animal": chosen[j], "thinking": thinking})
+                    new.append({"animal": chosen[j], "thinking": thinking})
             del out
+            if a.device == "mps":
+                torch.mps.empty_cache()
+            runs += new
+            with open(ckpt, "a") as f:
+                f.write(json.dumps({"s0": s0, "runs": new}) + "\n")
             print(f"turn 1: {s0 + B} generated, {len(runs)} kept, {time.time() - t0:.0f}s", flush=True)
 
         clean = layers_of(model(torch.tensor([prompt + reply], device=a.device), use_cache=True).past_key_values)
@@ -176,6 +189,9 @@ def main():
                              for k, v in layers_of(o.past_key_values)]
             r["think_ids"] = think
             states.append(torch.stack([h[0, -2].float().cpu() for h in o.hidden_states]).numpy())
+            del o
+            if a.device == "mps" and len(states) % 64 == 0:
+                torch.mps.empty_cache()
         np.save(a.out.replace(".json", "_states.npy"), np.stack(states).astype(np.float16))
 
         result = {"model": a.model, "wording": a.wording, "items": a.items, "choice": a.choice, "animals": NAMES, "chosen": [r["animal"] for r in runs],
