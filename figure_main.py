@@ -6,7 +6,8 @@
        question with the head and without it; each question alone and after Janus's LLM explainer
   f-g  Goodfire's 4-layer model: the fewest VPD subcomponents that raise recall on held-out sentences, against damage on
        held-out Pile text; which subcomponents of one such edit carry it
-Paired p-values: sign flips of each run's paired difference; p against chance: re-pairing hidden animals.
+Paired p-values: sign flips (t statistic) of each run's paired difference in the hidden animal's log P relative to
+that animal's mean over runs; p against chance: re-pairing hidden animals.
 usage: figure_main.py --results R.json ... --text4l T.json --flip figs/flip_rows.json --questions Q.npz[+Q2.npz]
        --refit F.json ... [--parts P.json]
 """
@@ -284,16 +285,22 @@ def panel_switch(cv, x, y, w, h, groups):
 
 
 def p_paired(diff, rng, B=100000):
-    """Two-sided sign-flip permutation p of the mean of paired differences (one per run): exact when, with no effect,
-    each difference is as likely positive as negative."""
-    signs = rng.choice([-1.0, 1.0], size=(B, len(diff)))
-    return (1 + np.sum(np.abs((signs * diff).mean(1)) >= abs(diff.mean()))) / (B + 1)
+    """Two-sided sign-flip permutation p of paired differences (one per run), with the t statistic: exact when, with no
+    effect, each difference is as likely positive as negative."""
+    t = lambda d: d.mean(-1) / (d.std(-1, ddof=1) / np.sqrt(d.shape[-1]))
+    flips = rng.choice([-1.0, 1.0], size=(B, len(diff))) * diff
+    return (1 + np.sum(np.abs(t(flips)) >= abs(t(diff)))) / (B + 1)
+
+
+def centred_logp(L, c):
+    """Per run, the hidden animal's log P minus that animal's mean log P over all runs of the same condition."""
+    return (L - L.mean(0))[np.arange(len(c)), c]
 
 
 def panel_paired(ax, pairs, lim):
     """Per hidden animal, discrimination in two conditions over the same runs (gray, then blue), joined by a line colored
     by its log2 fold change; pairs: [(log P first, log P second, hidden animal per run)]; p of the paired difference
-    over runs (sign flips of each run's paired difference)."""
+    over runs (sign flips of each run's paired difference in the hidden animal's centered log P)."""
     rng = np.random.default_rng(0)
     for k, (L0, L1, c) in enumerate(pairs):
         x0, x1 = 3 * k, 3 * k + 1.2
@@ -311,7 +318,7 @@ def panel_paired(ax, pairs, lim):
         ax.scatter(x1 + j, o1, s=55, color=BLUE, edgecolor="white", lw=0.6, zorder=3)
         for x, o in ((x0, o0), (x1, o1)):
             ax.plot([x - 0.3, x + 0.3], [o.mean()] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
-        d = per_run(L1, c) - per_run(L0, c)
+        d = centred_logp(L1, c) - centred_logp(L0, c)          # the paired test uses each run's log P, not its rank
         p_text(ax, (x0 + x1) / 2, lim[1] - 1, p_paired(d, rng), d.mean())
     ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
     ax.set_ylim(*lim)
@@ -384,8 +391,8 @@ def row_fourlayer(cv, refits, parts, y0):
     """Panels f-g, Goodfire's 4-layer model, occupying [y0, y0 + ROWS[2]].
     f: for each K, the scales of only the K largest subcomponents of a fitted edit fitted again on the training templates;
        recall on held-out templates against K, colored by KL on held-out Pile text (fourlayer/optimize_edit.py --support)
-    g: the subcomponents of one such edit, by weight matrix and change, sized by the held-out recall lost when each is left
-       out of the edit (fourlayer/optimize_edit.py --ablate)"""
+    g: the circuit of subcomponents behind recall in the unedited model, from measured removals
+       (fourlayer/subcomponent_circuit.py)"""
     top = y0 + ROWS[2]
     rows = sorted((o["support_k"], o["metrics"]) for path in refits if os.path.exists(path)
                   for o in json.load(open(path)).get("optimized", []))
@@ -413,28 +420,75 @@ def row_fourlayer(cv, refits, parts, y0):
     ax.set_xlabel("number of subcomponents rescaled")
     ax.set_ylabel("hidden word ranked above\nanother word (%)\non held-out sentences")
 
-    if not parts or not os.path.exists(parts) or "site_left_out" not in json.load(open(parts)).get("ablate", {}):
+    if not parts or not os.path.exists(parts):
         return
-    ab = json.load(open(parts))["ablate"]
-    whole = 100 * ab["whole"]["discrimination"]
     cv.letter(13.4, top - 0.75, "g")
-    cv.S.text(14.2, top - 0.75, "the edit works through layer 3's key and query subcomponents: recall\nlost when one matrix's part of the edit is left out (bars), or one subcomponent (dots)",
-              fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(15.6, y0 + 2.0, 11.8, 6.5)
-    rng = np.random.default_rng(0)
-    for i, (site, _) in enumerate(SITES):
-        keys = [k for k in ab["scales"] if k.split("#")[0] == site]
-        lost = whole - 100 * ab["site_left_out"][site]["discrimination"] if site in ab["site_left_out"] else 0.0
-        ax.bar(i, lost, width=0.62, color=BLUE, zorder=2)
-        singles = [whole - 100 * ab["left_out"][k]["discrimination"] for k in keys if k in ab["left_out"]]
-        ax.scatter(i + rng.uniform(-0.2, 0.2, len(singles)), singles, s=30, color=INK, alpha=0.6, zorder=3)
-        ax.text(i, -1.2, f"{len(keys)}", ha="center", va="top", fontsize=17, color=SLATE)
-    ax.text(-0.75, -1.2, "count:", ha="right", va="top", fontsize=17, color=SLATE)
-    ax.axhline(0, color=SLATE, lw=1.2)
-    ax.set_xticks(range(len(SITES)), [lab for _, lab in SITES], fontsize=18)
-    ax.tick_params(axis="x", length=0, pad=34)
-    ax.set_xlim(-0.6, len(SITES) - 0.4)
-    ax.set_ylabel(f"held-out recall lost\n(points, from {whole:.0f}%)")
+    cv.S.text(14.2, top - 0.75, "the circuit, from removing single subcomponents: a few query and key\n"
+              "subcomponents route the word; many value and output subcomponents carry it", fontsize=25, weight="bold",
+              va="center", linespacing=1.15)
+    g = json.load(open(parts))
+    screen = os.path.join(os.path.dirname(parts), "subcomponent_circuit.json")
+    if os.path.exists(screen):
+        g["screen"] = json.load(open(screen))["single"]
+    draw_gates(cv.axes(14.0, y0 + 0.2, 13.8, 9.0), g)
+
+
+def draw_gates(ax, g):
+    """The two attention steps of recall and the query/key subcomponents that gate them (fourlayer/attention_gates.py):
+    each gate's recall change when removed alone where it acts; blue: removing it lowers recall, coral: raises it."""
+    base = 100 * g["recall"]
+    def pick(prefix, n_sup, n_opp):
+        rows = [(k, 100 * v["recall"] - base) for k, v in g["gates"].items() if k.startswith(prefix)]
+        sup = sorted([r for r in rows if r[1] < 0], key=lambda r: r[1])[:n_sup]
+        opp = sorted([r for r in rows if r[1] > 0], key=lambda r: -r[1])[:n_opp]
+        return sup + opp
+    X, M, C = 1.2, 4.6, 8.4
+    for x0, w, lab in ((0.2, 2.0, "hidden word\n\u201cotter\u201d"), (3.0, 3.2, "later tokens\n\u201c. Nobody else knows.\u201d"),
+                       (7.2, 2.4, "cue\n\u201cMy pet is a\u201d")):
+        ax.add_patch(FancyBboxPatch((x0, 0.0), w, 1.0, boxstyle="round,pad=0,rounding_size=0.1", facecolor=PALE_SLATE, edgecolor="none"))
+        ax.text(x0 + w / 2, 0.5, lab, ha="center", va="center", fontsize=17, color=INK, linespacing=1.1)
+    ax.annotate("", xy=(10.3, 0.5), xytext=(9.65, 0.5), arrowprops=dict(arrowstyle="-|>", lw=2.5, color=INK, mutation_scale=22))
+    ax.text(10.4, 0.5, "hidden word's\nscore", ha="left", va="center", fontsize=17, color=INK)
+    ax.plot([X, C], [-0.35, -0.35], color=RED, lw=2, ls=(0, (3, 3)))
+    ax.text((X + C) / 2, -0.5, "the cue cannot attend to the hidden word", ha="center", va="top", fontsize=15, color=RED)
+    # step 1: layer 2 copies the word into the later tokens; step 2: layer 3 at the cue reads the later tokens
+    for (src, dst, y, title) in ((M, X, 3.3, "layer 2, head 2.3:\nthe later tokens copy the word"),
+                                 (C, M, 6.3, "layer 3, heads 3.4 and 3.5:\nthe cue reads the later tokens")):
+        ax.plot([src, src], [1.05, y], color=CLOUD, lw=1.5, ls=(0, (2, 2)), zorder=1)
+        ax.plot([dst, dst], [1.05, y], color=CLOUD, lw=1.5, ls=(0, (2, 2)), zorder=1)
+        ax.annotate("", xy=(dst, y), xytext=(src, y), arrowprops=dict(arrowstyle="-|>", lw=5, color=BLUE,
+                    connectionstyle="arc3,rad=0.3", mutation_scale=30), zorder=3)
+        ax.text((src + dst) / 2, y + 0.55 + 0.3 * abs(src - dst) / 3.8, title, ha="center", va="bottom", fontsize=18,
+                color=BLUE, weight="bold", linespacing=1.1)
+    names = {"q_proj": "query", "k_proj": "key"}
+    def gate(x, y, key, d):
+        site, rest = key.split("#")
+        col = BLUE if d < 0 else CORAL
+        ax.scatter([x], [y], s=110 + 220 * abs(d), color=col, edgecolor="white", lw=1.5, zorder=4)
+        ax.text(x + 0.3, y, f"{names[site.split('.')[-1]]} {rest.split('@')[0]}  {d:+.1f}", ha="left", va="center", fontsize=16, color=col)
+    for j, (k, d) in enumerate(pick("h.2.attn.k_proj", 2, 0)):
+        gate(0.45, 2.3 - 0.5 * j, k, d)
+    for j, (k, d) in enumerate(pick("h.2.attn.q_proj", 2, 1)):
+        gate(3.35, 2.45 - 0.48 * j, k, d)
+    for j, (k, d) in enumerate(pick("h.3.attn.q_proj", 1, 2)):
+        gate(7.45, 5.1 - 0.52 * j, k, d)
+    ax.text(0.45, 2.75, "keys at the word", fontsize=15, color=SLATE)
+    ax.text(3.35, 2.9, "queries at the later tokens", fontsize=15, color=SLATE)
+    ax.text(7.45, 5.55, "queries at the cue", fontsize=15, color=SLATE)
+    # nodes of the full removal screen on the same path (fourlayer/subcomponent_circuit.py, all 48 templates)
+    extra = [(5.15, 5.0, "h.3.attn.k_proj#145@later", "layer-3 key"),
+             (5.15, 4.3, "h.2.attn.o_proj#735@later", "layer-2 output"),
+             (7.45, 3.25, "h.3.attn.o_proj#806@cue", "layer-3 output")]
+    for x, y, key, lab in extra:
+        d = -100 * g.get("screen", {}).get(key, 0.0)
+        if d:
+            ax.scatter([x], [y], s=110 + 220 * abs(d), color=BLUE, edgecolor="white", lw=1.5, zorder=4)
+            ax.text(x + 0.3, y, f"{key.split('#')[1].split('@')[0]}  {d:+.1f}", ha="left", va="center", fontsize=16, color=BLUE)
+            ax.text(x + 0.3, y + 0.32, lab, ha="left", va="center", fontsize=13, color=SLATE)
+    ax.text(0.2, 8.6, "number: recall change (points) when that one subcomponent is removed where it acts", fontsize=16, color=SLATE)
+    ax.set_xlim(0, 12.6)
+    ax.set_ylim(-1.0, 8.9)
+    ax.axis("off")
 
 
 def main():
@@ -445,7 +499,7 @@ def main():
     ap.add_argument("--flip", required=True, help="JSON: groups of lines for panel c (see panel_switch)")
     ap.add_argument("--questions", required=True, help="edit_heads.py --save-logp outputs (.npz, sets joined with +) for d and e")
     ap.add_argument("--refit", nargs="+", required=True, help="fourlayer/optimize_edit.py --support outputs")
-    ap.add_argument("--parts", default=None, help="fourlayer/optimize_edit.py --ablate output")
+    ap.add_argument("--parts", default=None, help="fourlayer/attention_gates.py output")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
