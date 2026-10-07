@@ -31,27 +31,47 @@ ANIMALS = ["aardvark", "albatross", "alpaca", "armadillo", "axolotl", "badger", 
            "ferret", "flamingo", "gazelle", "gecko", "giraffe", "gorilla", "hedgehog", "heron", "hyena", "iguana",
            "jackal", "jaguar", "kangaroo", "koala", "lemur", "lobster", "lynx", "manatee", "meerkat", "mongoose",
            "narwhal", "ocelot", "octopus", "okapi", "orca", "otter", "pangolin", "pelican", "penguin", "porcupine"]
-TURN1 = ("Here is a list of animals: " + ", ".join(ANIMALS) + ". In your thinking only, choose one animal from this "
-         "list at random and hold it in mind; later you will be asked which one you chose, without your thinking being "
-         "available. Do not reveal it. Reply with exactly the phrase: \"I understand.\" (Without the quotation marks.)")
-RECALL = ("In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you "
-          "now. Which animal did you choose? Answer in exactly this format: Animal: <animal>")
+COUNTRIES = ["argentina", "australia", "austria", "belgium", "brazil", "canada", "chile", "china", "colombia", "cuba",
+             "denmark", "egypt", "ethiopia", "finland", "france", "germany", "ghana", "greece", "iceland", "india",
+             "indonesia", "iran", "iraq", "ireland", "israel", "italy", "japan", "jordan", "kenya", "malaysia", "mexico",
+             "mongolia", "morocco", "nepal", "netherlands", "nigeria", "norway", "pakistan", "peru", "philippines",
+             "poland", "portugal", "russia", "spain", "sweden", "switzerland", "thailand", "turkey", "ukraine", "vietnam"]
+# the hidden item's category: its list, plural, singular and answer label
+ITEMS = {"animals": (ANIMALS, "animals", "animal", "Animal"), "countries": (COUNTRIES, "countries", "country", "Country")}
+TURN1_T = ("Here is a list of {pl}: {items}. In your thinking only, choose one {sg} from this list at random and hold it "
+           "in mind; later you will be asked which one you chose, without your thinking being available. Do not reveal "
+           "it. Reply with exactly the phrase: \"I understand.\" (Without the quotation marks.)")
+RECALL_T = ("In the previous turn you chose one {sg} from the list in your thinking. That thinking is not shown to you "
+            "now. Which {sg} did you choose? Answer in exactly this format: {lab}: <{sg}>")
 # a second wording of both turns, to test whether results depend on the phrasing
-TURN1_B = ("You are participating in an experiment about how your internal reasoning relates to your later answers. "
-           "Here is a list of animals: " + ", ".join(ANIMALS) + ". In your internal thinking only, choose one animal from "
-           "this list at random and hold it firmly in mind; later you will be asked to recall it without your thinking "
-           "being available. Do not reveal it in your visible answer. In your final answer for this turn, respond with "
-           "exactly the phrase: \"I understand.\" (Without the quotation marks.)")
-RECALL_B = ("In the preceding turn of this conversation, during your internal thinking, you chose one animal from the "
-            "list. That thinking is not shown to you now. Recall, introspect, or reconstruct which animal you chose, and "
-            "answer in exactly this format: Animal: <animal>")
+TURN1_B_T = ("You are participating in an experiment about how your internal reasoning relates to your later answers. "
+             "Here is a list of {pl}: {items}. In your internal thinking only, choose one {sg} from this list at random "
+             "and hold it firmly in mind; later you will be asked to recall it without your thinking being available. Do "
+             "not reveal it in your visible answer. In your final answer for this turn, respond with exactly the phrase: "
+             "\"I understand.\" (Without the quotation marks.)")
+RECALL_B_T = ("In the preceding turn of this conversation, during your internal thinking, you chose one {sg} from the "
+              "list. That thinking is not shown to you now. Recall, introspect, or reconstruct which {sg} you chose, and "
+              "answer in exactly this format: {lab}: <{sg}>")
+NEUTRAL_T = "Name one {sg} from the list above, whichever you like. Answer in exactly this format: {lab}: <{sg}>"
+
+
+def task(wording="A", items="animals"):
+    """The prompts of a wording and item category: turn 1, recall, the neutral question, the answer label, the items."""
+    names, pl, sg, lab = ITEMS[items]
+    f = dict(pl=pl, sg=sg, lab=lab, items=", ".join(names))
+    t1, rc = (TURN1_T, RECALL_T) if wording == "A" else (TURN1_B_T, RECALL_B_T)
+    return {"turn1": t1.format(**f), "recall": rc.format(**f), "neutral": NEUTRAL_T.format(**f), "label": lab, "items": names}
+
+
+TURN1, RECALL = task("A")["turn1"], task("A")["recall"]
+TURN1_B, RECALL_B = task("B")["turn1"], task("B")["recall"]
 WORDINGS = {"A": (TURN1, RECALL), "B": (TURN1_B, RECALL_B)}
 
 
-def last_named(text):
-    """The animal of the list whose name ends last in the text (whole words, any case), or None."""
+def last_named(text, names=ANIMALS):
+    """The item of the list whose name ends last in the text (whole words, any case), or None."""
     low, best, end = text.lower(), None, -1
-    for c in ANIMALS:
+    for c in names:
         for m in re.finditer(r"\b" + c + r"s?\b", low):
             if m.end() > end:
                 best, end = c, m.end()
@@ -60,12 +80,18 @@ def last_named(text):
 
 def prompts(result):
     """The first-turn and recall prompts a hidden_choice.py result was made with."""
-    return WORDINGS[result.get("wording", "A")]
+    t = task_of(result)
+    return t["turn1"], t["recall"]
 
 
-NEUTRAL = "Name one animal from the list above, whichever you like. Answer in exactly this format: Animal: <animal>"
+def task_of(result):
+    """The full task (prompts, answer label, items) a hidden_choice.py result was made with."""
+    return task(result.get("wording", "A"), result.get("items", "animals"))
+
+
+NEUTRAL = task("A")["neutral"]
 OPEN = ["Okay, I need to pick one at random.", "Let me choose randomly from the list.", "Alright, a random pick.",
-        "I'll just let chance decide.", "Hmm, picking one without overthinking.", "Fine, one animal from the list."]
+        "I'll just let chance decide.", "Hmm, picking one without overthinking.", "Fine, one {sg} from the list."]
 CLOSE = ["It came up first in my draw.", "No particular reason.", "That one stands out.", "Good enough.",
          "I'll stick with it.", "Decided.", "That's my pick, final."]
 
@@ -83,6 +109,7 @@ def main():
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--wording", default="A", choices=sorted(WORDINGS))
+    ap.add_argument("--items", default="animals", choices=sorted(ITEMS))
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     rng = np.random.default_rng(a.seed)
@@ -93,26 +120,27 @@ def main():
     inv_freq = model.model.rotary_emb.inv_freq.detach().cpu()
     chat = lambda msgs: tok.encode(tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True,
                                                            enable_thinking=True), add_special_tokens=False)
-    TURN1, RECALL = WORDINGS[a.wording]
+    T = task(a.wording, a.items)
+    TURN1, RECALL, NEUTRAL, NAMES = T["turn1"], T["recall"], T["neutral"], T["items"]
     prompt = chat([{"role": "user", "content": TURN1}])
     reply = tok.encode("I understand.<|im_end|>", add_special_tokens=False)
     P, R = len(prompt), len(reply)
-    answer = tok.encode("<think>\n\n</think>\n\nAnimal:", add_special_tokens=False)
+    answer = tok.encode(f"<think>\n\n</think>\n\n{T['label']}:", add_special_tokens=False)
     suffix = {}
     for name, question in (("recall", RECALL), ("neutral", NEUTRAL)):
         full = chat([{"role": "user", "content": TURN1}, {"role": "assistant", "content": "I understand."},
                      {"role": "user", "content": question}])
         assert full[:P] == prompt and full[P:P + R] == reply, "chat template does not keep the turn-1 prefix"
         suffix[name] = full[P + R:] + answer
-    forms = [(c, tok.encode(f, add_special_tokens=False)) for c in ANIMALS for f in (" " + c.title(), " " + c)]
+    forms = [(c, tok.encode(f, add_special_tokens=False)) for c in NAMES for f in (" " + c.title(), " " + c)]
 
     runs = []
     with torch.no_grad():
         t0 = time.time()
         for s0 in range(0, a.n, a.batch):
             B = min(a.batch, a.n - s0)
-            chosen = [ANIMALS[k] for k in rng.integers(0, len(ANIMALS), B)]
-            starts = ["<think>\n"] * B if a.choice == "free" else [f"<think>\n{OPEN[rng.integers(len(OPEN))]} Draw #{rng.integers(100, 1000)}: {c}. "
+            chosen = [NAMES[k] for k in rng.integers(0, len(NAMES), B)]
+            starts = ["<think>\n"] * B if a.choice == "free" else [f"<think>\n{OPEN[rng.integers(len(OPEN))].format(sg=ITEMS[a.items][2])} Draw #{rng.integers(100, 1000)}: {c}. "
                       f"{CLOSE[rng.integers(len(CLOSE))]} I'll keep {c} in mind." for c in chosen]
             seqs = [prompt + tok.encode(s, add_special_tokens=False) for s in starts]
             W = max(map(len, seqs))
@@ -129,7 +157,7 @@ def main():
                 if visible.strip() == "I understand.":
                     thinking = thinking.replace("<think>", "", 1).strip()
                     if a.choice == "free":
-                        named = last_named(thinking)
+                        named = last_named(thinking, NAMES)
                         if named is None:
                             continue
                         chosen[j] = named
@@ -150,10 +178,10 @@ def main():
             states.append(torch.stack([h[0, -2].float().cpu() for h in o.hidden_states]).numpy())
         np.save(a.out.replace(".json", "_states.npy"), np.stack(states).astype(np.float16))
 
-        result = {"model": a.model, "wording": a.wording, "choice": a.choice, "animals": ANIMALS, "chosen": [r["animal"] for r in runs],
+        result = {"model": a.model, "wording": a.wording, "items": a.items, "choice": a.choice, "animals": NAMES, "chosen": [r["animal"] for r in runs],
                   "thinking": [r["thinking"] for r in runs], "arms": {}}
         for arm in a.arms.split(","):
-            L = np.zeros((len(runs), len(ANIMALS)))
+            L = np.zeros((len(runs), len(NAMES)))
             for i, r in enumerate(runs if arm != "stripped" else runs[:1]):
                 if arm == "visible":
                     o = model(torch.tensor([prompt + r["think_ids"] + reply + suffix["recall"]], device=a.device), use_cache=True)
@@ -166,7 +194,7 @@ def main():
                 best = {}
                 for (c, _), s in zip(forms, scores):
                     best[c] = np.logaddexp(best.get(c, -np.inf), s)
-                L[i] = [best[c] for c in ANIMALS]
+                L[i] = [best[c] for c in NAMES]
             if arm == "stripped":
                 L[:] = L[0]
             result["arms"][arm] = L.tolist()

@@ -14,10 +14,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("model")
     ap.add_argument("--wording", default="A")
+    ap.add_argument("--recall-wording", default=None, help="the recall question's wording, if different from turn 1's")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
-    TURN1, RECALL = WORDINGS[a.wording]
+    TURN1, RECALL = WORDINGS[a.wording][0], WORDINGS[a.recall_wording or a.wording][1]
     tok = AutoTokenizer.from_pretrained(a.model)
     model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float32, device_map=a.device,
                                                  attn_implementation="eager").eval()
@@ -32,7 +33,7 @@ def main():
                  {"role": "user", "content": RECALL}]) + tok.encode("<think>\n\n</think>\n\nAnimal:", add_special_tokens=False)
     with torch.no_grad():
         att = model(torch.tensor([full], device=a.device), output_attentions=True).attentions
-    res = {"model": a.model, "wording": a.wording, "reply_tokens": [tok.decode([t]) for t in reply], "heads": {}, "kv_heads": {}}
+    res = {"model": a.model, "wording": a.wording, "recall_wording": a.recall_wording or a.wording, "reply_tokens": [tok.decode([t]) for t in reply], "heads": {}, "kv_heads": {}}
     for l, A in enumerate(att):
         w = A[0, :, -1, P:P + R].float().cpu()                       # [heads, reply tokens]
         for q in range(cfg.num_attention_heads):

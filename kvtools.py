@@ -58,7 +58,7 @@ def score_candidates(model, cache_layers, last_logp, candidates, device):
         mask[0, 0, q, P + q - t:P + q + 1] = 0
     cache = DynamicCache.from_legacy_cache(tuple((k.to(device), v.to(device)) for k, v in cache_layers))
     logits = model(torch.tensor([ids] * B, device=device), position_ids=torch.tensor([pos] * B, device=device),
-                   attention_mask=mask.expand(B, 1, T, P + T), past_key_values=cache, use_cache=False).logits
+                   attention_mask=mask.expand(B, 1, T, P + T).contiguous(), past_key_values=cache, use_cache=False).logits
     first = torch.tensor([toks[0] for toks in candidates])
     rows, cols, start = [], [], []
     q = 0

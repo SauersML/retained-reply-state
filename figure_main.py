@@ -59,31 +59,38 @@ class Canvas:
         self.S.text(x, y, s, fontsize=40, weight="bold", va="center", color=INK)
 
 
-def own_matrix(path, arm):
-    d = json.load(open(path))
-    L = np.array(d["arms"][arm])
-    c = np.array([d["animals"].index(x) for x in d["chosen"]])
+def per_animal(L, c, perm=None):
+    """Per hidden animal: the share of the other animals it is ranked above at recall in its runs, each animal's log P
+    taken relative to its mean over all runs (50% = chance).  With perm, the hidden animals are re-paired at random."""
+    D = L - L.mean(0)
     present = np.unique(c)
-    M = np.array([L[c == a].mean(0)[present] for a in present]) - L.mean(0)[present]
-    return M, L, c
+    lab = c if perm is None else perm[np.searchsorted(present, c)]
+    own = D[np.arange(len(c)), lab]
+    diff = own[:, None] - D                                     # differences under 1e-9 nats are ties (rounding)
+    acc = ((diff > 1e-9).sum(1) + 0.5 * ((np.abs(diff) <= 1e-9).sum(1) - 1)) / (D.shape[1] - 1)
+    return np.array([acc[c == a].mean() for a in present]) * 100
 
 
 def strip(ax, paths, arm, lim, ticks, pvals):
     rng = np.random.default_rng(0)
     for k, p in enumerate(paths):
-        M, L, c = own_matrix(p, arm)
-        own, other = np.diag(M), M[~np.eye(len(M), dtype=bool)]
-        sub = rng.choice(other, min(600, other.size), replace=False)
-        ax.scatter(k - 0.3 + rng.uniform(0, 0.24, sub.size), sub, s=10, color=CLOUD, alpha=0.9, edgecolor="none", zorder=2)
+        d = json.load(open(p))
+        L = np.array(d["arms"][arm])
+        c = np.array([d["animals"].index(x) for x in d["chosen"]])
+        own = per_animal(L, c)
+        present = np.unique(c)
+        null = np.concatenate([per_animal(L, c, rng.permutation(present)) for _ in range(12)])
+        ax.scatter(k - 0.3 + rng.uniform(0, 0.24, null.size), null, s=10, color=CLOUD, alpha=0.9, edgecolor="none", zorder=2)
         ax.scatter(k + 0.06 + rng.uniform(0, 0.22, own.size), own, s=60, color=BLUE, alpha=0.9, edgecolor="white",
                    lw=0.6, zorder=3, clip_on=False)
         ax.plot([k + 0.03, k + 0.31], [own.mean()] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
         if pvals:
-            pv = animal_level(L, c, np.random.default_rng(0), 20000, two_sided=True)[1]
-            col = SLATE if pv >= 0.05 else (BLUE if own.mean() > 0 else CORAL)
-            ax.text(k, lim[1] * 0.97, f"p={pv:.1g}" if pv >= 1e-3 else "p<0.001", ha="center", va="top",
+            nulls = np.array([per_animal(L, c, rng.permutation(present)).mean() for _ in range(2000)])
+            pv = (1 + np.sum(np.abs(nulls - 50) >= abs(own.mean() - 50))) / 2001
+            col = SLATE if pv >= 0.05 else (BLUE if own.mean() > 50 else CORAL)
+            ax.text(k, lim[1] * 0.985, f"p={pv:.1g}" if pv >= 1e-3 else "p<0.001", ha="center", va="top",
                     fontsize=21, color=col, weight="bold" if pv < 0.05 else "normal")
-    ax.axhline(0, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=1)
+    ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=1)
     ax.set_xlim(-0.55, len(paths) - 0.45)
     ax.set_ylim(*lim)
     ax.set_yticks(ticks)
@@ -131,19 +138,17 @@ def row_experiment(cv, paths, y0, text4l=None):
     cv.S.text(11.2, y0 + 0.65, "kept from turn 1", fontsize=21, va="center", color=BLUE)
 
     cv.letter(15.4, top - 0.95, "b")
-    cv.S.text(16.2, top - 0.95, "log P(animal) at recall, above its average", fontsize=29, weight="bold", va="center")
+    cv.S.text(16.2, top - 0.95, "the hidden animal, ranked above another animal at recall", fontsize=29, weight="bold", va="center")
     cv.S.scatter([16.4], [top - 1.75], s=130, color=BLUE, edgecolor="white")
     cv.S.text(16.7, top - 1.75, "this animal was hidden", fontsize=22, color=BLUE, va="center")
     cv.S.add_patch(plt.Rectangle((22.0, top - 1.95), 0.4, 0.4, facecolor=CLOUD, edgecolor="none"))
     cv.S.text(22.6, top - 1.75, "another animal was hidden", fontsize=22, color=SLATE, va="center")
-    specs = {"stripped": ((-0.25, 0.25), [-0.2, 0, 0.2], False),
-             "retained": ((-0.25, 0.34), [-0.2, 0, 0.2], True),
-             "visible": ((-20, 45), [0, 20, 40], False)}
+    specs = {"stripped": ((18, 80), [30, 50, 70], False),
+             "retained": ((18, 80), [30, 50, 70], True),
+             "visible": ((18, 105), [50, 100], False)}
+    specs4 = specs
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
-    arrows = {"stripped": (0.01, 0.24, BLUE, "toward"), "visible": (-1, -19, CORAL, "away")}
-    specs4 = {"stripped": ((-0.25, 0.25), [-0.2, 0, 0.2], False),
-              "retained": ((-0.4, 1.2), [0, 0.4, 0.8], True),
-              "visible": ((-4, 12), [0, 4, 8], False)}
+    arrows = {"stripped": (51, 78, BLUE, "toward"), "visible": (49, 27, CORAL, "away")}
     for (name, _), y in zip(rows, ys):
         if text4l:
             ax4 = cv.axes(24.4, y - 0.55, 3.2, h + 1.1)
@@ -156,11 +161,11 @@ def row_experiment(cv, paths, y0, text4l=None):
         lim, ticks, pv = specs[name]
         strip(ax, paths, name, lim, ticks, pv)
         if name not in arrows:
-            ax.set_ylabel("nats", fontsize=22)
+            ax.set_ylabel("%", fontsize=22)
         if name == "visible":
             ax.set_xticks(range(len(paths)), ["Qwen3\n" + json.load(open(p))["model"].split("-")[-1] for p in paths])
         if name == "stripped":
-            ax.text(len(paths) / 2 - 0.5, 0.12, "identical in every run, so exactly 0", ha="center", fontsize=20, color=SLATE)
+            ax.text(len(paths) / 2 - 0.5, 68, "identical in every run, so exactly chance", ha="center", fontsize=20, color=SLATE)
         if name in arrows:
             y_from, y_to, col, lab = arrows[name]
             ax.annotate("", xy=(-0.105, y_to), xytext=(-0.105, y_from), xycoords=("axes fraction", "data"),
@@ -169,89 +174,130 @@ def row_experiment(cv, paths, y0, text4l=None):
                     va="center", fontsize=21, color=col)
 
 
-def row_mechanism(cv, pd_path, dosesub_path, y0):
-    """Panels c-d, occupying [y0, y0 + ROWS[1]]."""
+def panel_flip(cv, x, y, w, h, flips, controls):
+    """Qwen3-1.7B: discrimination before and after the weight edit, one line per dataset; the control edits in gray.
+    flips: [(label, edit_heads.py output, edit spec)]; controls: (edit_heads.py output, [specs])."""
+    ax = cv.axes(x, y, w, h)
+    for label, path, spec in flips:
+        try:
+            e = json.load(open(path))["edits"]
+        except (FileNotFoundError, KeyError):
+            continue
+        pick = lambda r: r["retained"]["discrimination"] if "retained" in r else r["discrimination"]
+        if spec not in e or "none" not in e:
+            continue
+        a, b = 100 * pick(e["none"]), 100 * pick(e[spec])
+        ax.plot([0, 1], [a, b], "-o", color=BLUE if b > 50 else SLATE, lw=4, ms=12, zorder=3)
+        ax.text(1.06, b, label, va="center", fontsize=19, color=BLUE if b > 50 else SLATE)
+    cpath, cspecs = controls
+    try:
+        e = json.load(open(cpath))["edits"]
+        for spec in cspecs:
+            if spec in e:
+                b = 100 * (e[spec]["retained"]["discrimination"] if "retained" in e[spec] else e[spec]["discrimination"])
+                a = 100 * (e["none"]["retained"]["discrimination"] if "retained" in e["none"] else e["none"]["discrimination"])
+                ax.plot([0, 1], [a, b], "-o", color=CLOUD, lw=2.5, ms=7, zorder=2)
+    except FileNotFoundError:
+        pass
+    ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
+    ax.set_xlim(-0.25, 1.9)
+    ax.set_ylim(35, 75)
+    ax.set_xticks([0, 1], ["unedited", "two heads'\nweights deleted"])
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
+    return ax
+
+
+def row_mechanism(cv, why_paths, sweep_paths, y0, flips=(), controls=("", [])):
+    """Panels c-e, occupying [y0, y0 + ROWS[1]]."""
     top = y0 + ROWS[1]
-
-    # c: delete one subcomponent of the decomposition (4-layer model)
-    d = json.load(open(pd_path))
-    base = d.get("screen_base", 0.2712)
-    order = ["h.2.attn.k_proj", "h.2.attn.v_proj", "h.2.attn.q_proj", "h.2.attn.o_proj",
-             "h.3.attn.k_proj", "h.3.attn.v_proj", "h.3.attn.q_proj", "h.3.attn.o_proj"]
-    names = {"k_proj": "key", "v_proj": "value", "q_proj": "query", "o_proj": "output"}
     cv.letter(0.1, top - 0.7, "c")
-    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model, later tokens' cache kept: remove one VPD subcomponent\nwhere its matrix acts in this circuit (each dot is one rank-one piece of an attention matrix)",
-              fontsize=25, weight="bold", va="center", linespacing=1.15)
-    # the route: the word reaches the cue only through the tokens after it
-    yb, hb = top - 3.15, 0.8
-    cv.block(2.6, yb, 1.7, hb, "white", "#e3a1a8", "otter", fs=22, color="#d98b93", style=(0, (4, 3)))
-    cv.S.text(3.45, yb + hb + 0.25, "not kept", ha="center", fontsize=20, color=RED, weight="bold")
-    cv.block(6.2, yb, 4.3, hb, PALE_BLUE, BLUE, ". Nobody else knows.", fs=22)
-    cv.S.text(8.35, yb + hb + 0.25, "cache kept", ha="center", fontsize=20, color=BLUE, weight="bold")
-    cv.block(12.4, yb, 3.2, hb, PALE_SLATE, "none", "My pet is a", fs=22)
-    for x_from, x_to, lab in ((4.35, 6.15, "layer 2"), (10.55, 12.35, "layer 3")):
-        cv.S.annotate("", xy=(x_to, yb + hb / 2), xytext=(x_from, yb + hb / 2),
-                      arrowprops=dict(arrowstyle="-|>", color=INK, lw=2.5, mutation_scale=24))
-        cv.S.text((x_from + x_to) / 2, yb - 0.32, lab, ha="center", fontsize=20, weight="bold")
-    ax = cv.axes(2.2, y0 + 1.9, 13.6, 7.0)
-    rng = np.random.default_rng(0)
-    for k, site in enumerate(order):
-        sd = d["sites"][site]
-        idx = [i for i, x in enumerate(sd["screen_drops"]) if x is not None]
-        drops = np.array([sd["screen_drops"][i] for i in idx]) / base * 100
-        top2 = [j for j in np.argsort(drops)[::-1][:2] if drops[j] > 8]
-        lo = int(np.argmin(drops))
-        marked4 = set(top2) | ({lo} if drops[lo] < -8 else set())
-        rest = np.array([x for j, x in enumerate(drops) if j not in marked4])
-        ax.scatter(k + rng.uniform(-0.18, 0.18, rest.size), rest, s=30, color=CLOUD, zorder=2)
-        for j in top2:
-            ax.scatter([k], [drops[j]], s=200, color=BLUE, zorder=3, edgecolor="white", lw=2)
-        if drops[lo] < -8:
-            ax.scatter([k], [drops[lo]], s=200, color=CORAL, zorder=3, edgecolor="white", lw=2)
-    ax.axhline(0, color=SLATE, lw=1.4, ls=(0, (4, 3)))
-    ax.axvline(3.5, color=SLATE, lw=1.2)
-    ax.set_xticks(range(len(order)), [names[s_.split(".")[-1]] for s_ in order], fontsize=21)
-    ax.text(1.5, 106, "layer 2", ha="center", fontsize=23, weight="bold")
-    ax.text(5.5, 106, "layer 3", ha="center", fontsize=23, weight="bold")
-    ax.set_ylim(-110, 118)
-    ax.set_yticks([-100, -50, 0, 50, 100])
-    ax.set_ylabel("% of the effect removed")
+    cv.S.text(0.9, top - 0.7, "Qwen3-1.7B: delete the output weights\nof two layer-21 attention heads", fontsize=25,
+              weight="bold", va="center", linespacing=1.15)
+    panel_flip(cv, 2.4, y0 + 1.9, 4.6, 8.6, flips, controls)
 
-    # d: dose-response of single subcomponents, as weight edits W + (a - 1) u v^T everywhere (4-layer model)
-    cv.letter(17.4, top - 0.7, "d")
-    cv.S.text(18.2, top - 0.7, "same model and condition: scale one VPD\nsubcomponent in the weights (0 = deleted)",
+    # d: the 4-layer circuit, three VPD subcomponents that set it (attention measured by fourlayer/why4l.py)
+    cv.letter(8.9, top - 0.7, "d")
+    cv.S.text(9.7, top - 0.7, "Goodfire 4-layer model: three VPD subcomponents\nset how much of the word reaches the cue",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(19.6, y0 + 1.9, 6.6, 8.6)
-    ds = json.load(open(dosesub_path))
-    show = {"h.3.attn.q_proj#334": (CORAL, "layer-3 query #334"), "h.2.attn.k_proj#224": (BLUE, "layer-2 key #224")}
-    for key, rows in ds.items():
-        a = [r["dose"] for r in rows]
-        y = [r["raise"] for r in rows]
-        col, lab = show.get(key, (CLOUD, None))
-        ax.plot(a, y, "-o", color=col, lw=4 if lab else 2.5, ms=9 if lab else 5, zorder=3 if lab else 2)
-        if lab:
-            ax.text(a[-1] + 0.3, y[-1], lab.replace(" #", "\n#"), color=col, fontsize=20, va="center", weight="bold")
-    ax.axvline(1, color=SLATE, lw=1.2, ls=(0, (4, 3)))
-    ax.axhline(0, color=SLATE, lw=1.2)
-    ax.set_xlim(-0.4, 11.8)
-    ax.set_xticks([0, 1, 4, 8])
-    ax.set_xlabel("strength of the subcomponent")
-    ax.set_ylabel("effect of the hidden word (nats)")
+    why, why_b = json.load(open(why_paths[0])), json.load(open(why_paths[1]))["H2"]
+    ax = cv.axes(8.9, y0 + 0.4, 10.6, 9.6)
+    ax.set_xlim(0, 16)
+    ax.set_ylim(0, 10)
+    ax.axis("off")
+    hb, yb = 1.1, 1.3
+    def tok(x, w, text, face, edge, color=INK, style="-"):
+        ax.add_patch(FancyBboxPatch((x, yb), w, hb, boxstyle="round,pad=0,rounding_size=0.12", facecolor=face,
+                                    edgecolor=edge, lw=2.5, linestyle=style))
+        ax.text(x + w / 2, yb + hb / 2, text, ha="center", va="center", fontsize=20, color=color)
+    tok(0.0, 2.2, "first token", PALE_SLATE, "none")
+    tok(2.6, 2.0, "otter", "white", "#e3a1a8", color="#d98b93", style=(0, (4, 3)))
+    tok(5.0, 5.0, ". Nobody else knows.", PALE_BLUE, BLUE)
+    tok(10.5, 3.7, "My pet is a", PALE_SLATE, "none")
+    ax.text(3.6, 0.6, "not kept", ha="center", fontsize=18, color=RED)
+    ax.text(7.5, 0.6, "cache kept", ha="center", fontsize=18, color=BLUE)
+    ax.text(12.35, 0.6, "cue", ha="center", fontsize=18, color=SLATE)
+    from matplotlib.patches import FancyArrowPatch
+    def arr(a, b, width, color, rad):
+        ax.add_patch(FancyArrowPatch(a, b, arrowstyle="-|>", mutation_scale=28, lw=width, color=color,
+                                     connectionstyle=f"arc3,rad={rad}", shrinkA=3, shrinkB=3))
+    copy = lambda d: float(np.mean([d["write_layer2"][2], d["write_layer2"][3]]))
+    top_y = yb + hb + 0.05
+    arr((6.8, top_y), (3.9, top_y), 2 + 30 * copy(why["none"]), BLUE, 0.55)
+    arr((11.6, top_y), (8.4, top_y), 2 + 30 * why_b["with #334"]["later tokens"], INK, 0.55)
+    arr((12.8, top_y), (1.1, top_y), 2 + 30 * why_b["with #334"]["first token"], CLOUD, 0.42)
+    ax.text(5.35, 3.25, "layer 2 copies", ha="center", fontsize=19, color=BLUE, weight="bold")
+    ax.text(10.0, 3.25, "layer 3 reads", ha="center", fontsize=19, color=INK, weight="bold")
+    ax.text(6.95, 4.55, "or the first token", ha="center", fontsize=18, color=SLATE)
+    # the three dials, each at the token where it acts
+    dials = [(3.6, 6.0, BLUE, "key #224", "stronger: more copying", "left"),
+             (3.6, 7.9, CORAL, "MLP out #1320", "deleted: more copying", "left"),
+             (12.35, 6.0, CORAL, "query #334", "deleted: reads the\nlater tokens more", "right")]
+    for dx, dy, col, name, what, side in dials:
+        ax.plot([dx, dx], [yb + hb + 0.1, dy - 0.4], color=col, lw=1.5, ls=(0, (2, 2)))
+        ax.scatter([dx], [dy], s=420, color=col, zorder=5)
+        tx, ha = (dx + 0.45, "left") if side == "left" else (dx - 0.45, "right")
+        ax.text(tx, dy + 0.1, name, fontsize=20, color=col, weight="bold", va="center", ha=ha)
+        ax.text(tx, dy - 0.65, what, fontsize=17, color=SLATE, va="center", ha=ha, linespacing=0.95)
+
+    # e: what the edits buy, against damage on other text (fourlayer/edit_eval.py)
+    cv.letter(19.9, top - 0.7, "e")
+    cv.S.text(20.7, top - 0.7, "same model: turn the three\nsubcomponents in the weights", fontsize=25, weight="bold",
+              va="center", linespacing=1.15)
+    ax = cv.axes(21.6, y0 + 1.9, 5.9, 8.6)
+    pts = [(r["pile_kl"], 100 * r["discrimination"]) for path in sweep_paths for spec, r in json.load(open(path)).items()
+           if "discrimination" in r]
+    xs, ys = np.array([p[0] for p in pts]), np.array([p[1] for p in pts])
+    ax.scatter(xs, ys, s=60, color=CLOUD, zorder=2)
+    best, front = -1, []
+    for i in np.argsort(xs):
+        if ys[i] > best:
+            best, front = ys[i], front + [i]
+    ax.plot(xs[front], ys[front], "-o", color=BLUE, lw=3.5, ms=10, zorder=3)
+    ax.scatter([0], [ys[np.argmin(xs)]], s=220, color=INK, zorder=4)
+    ax.annotate("unedited", (0, ys[np.argmin(xs)]), xytext=(12, -14), textcoords="offset points", fontsize=19)
+    ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
+    ax.set_ylim(35, 85)
+    ax.set_xlabel("damage on other text\n(KL, nats per token)")
+    ax.set_ylabel("hidden word ranked above\nanother word (%)")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results", nargs="+", required=True)
-    ap.add_argument("--pd4l", required=True)
     ap.add_argument("--text4l", nargs="*", default=[],
-                    help="fourlayer/hidden_span.py outputs: the same three conditions in text, 4-layer model (unedited, edited)")
-    ap.add_argument("--dosesub", required=True, help="fourlayer/dose_sub.py output")
+                    help="fourlayer/hidden_span.py outputs: the same three conditions in text, 4-layer model")
+    ap.add_argument("--why", nargs=2, required=True, help="fourlayer/why4l.py and why4l_b.py outputs")
+    ap.add_argument("--sweep", nargs="+", required=True, help="fourlayer/edit_eval.py outputs")
+    ap.add_argument("--flip", nargs="*", default=[], help="label=edit_heads.json=spec, one per dataset")
+    ap.add_argument("--controls", default="", help="edit_heads.json=spec;spec;... with the control edits")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
+    flips = [tuple(f.split("=", 2)) for f in a.flip]
+    controls = (a.controls.split("=", 1)[0], a.controls.split("=", 1)[1].split(";")) if a.controls else ("", [])
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1], a.text4l)
-    row_mechanism(cv, a.pd4l, a.dosesub, 0)
+    row_mechanism(cv, a.why, a.sweep, 0, flips, controls)
     cv.S.plot([0.3, W - 0.3], [ROWS[1], ROWS[1]], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=110)
 
