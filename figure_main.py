@@ -3,8 +3,8 @@
        model, for the hidden animal (blue) and for every other animal (gray); last column: the same three conditions in
        plain text on the 4-layer model (a word, then later tokens, then a cue that repeats the word's frame)
   c-d  a 4-layer model with a published parameter decomposition: the share of the effect removed by deleting each single
-       subcomponent (fourlayer/pd4l.py), and top-1 recall when the carried state is amplified (fourlayer/dose4l.py)
-usage: figure_main.py --results R.json ... --text4l T.json --pd4l P.json --dose4l D4.json
+       subcomponent (fourlayer/pd4l.py), and the effect when one subcomponent's weight is scaled (fourlayer/dose_sub.py)
+usage: figure_main.py --results R.json ... --text4l T.json --pd4l P.json --dosesub S.json
 """
 import argparse
 import json
@@ -168,7 +168,7 @@ def row_experiment(cv, paths, y0, text4l=None):
                     va="center", fontsize=21, color=col)
 
 
-def row_mechanism(cv, pd_path, dose4_path, y0):
+def row_mechanism(cv, pd_path, dosesub_path, y0):
     """Panels c-d, occupying [y0, y0 + ROWS[1]]."""
     top = y0 + ROWS[1]
 
@@ -179,7 +179,7 @@ def row_mechanism(cv, pd_path, dose4_path, y0):
              "h.3.attn.k_proj", "h.3.attn.v_proj", "h.3.attn.q_proj", "h.3.attn.o_proj"]
     names = {"k_proj": "key", "v_proj": "value", "q_proj": "query", "o_proj": "output"}
     cv.letter(0.1, top - 0.7, "c")
-    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model: delete one VPD subcomponent\n(one rank-one piece of one attention weight matrix; each dot is one)",
+    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model: remove one VPD subcomponent where its matrix\nacts in this circuit (each dot is one rank-one piece of an attention matrix)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(2.2, y0 + 1.9, 13.6, 7.4)
     rng = np.random.default_rng(0)
@@ -205,23 +205,26 @@ def row_mechanism(cv, pd_path, dose4_path, y0):
     ax.set_yticks([-100, -50, 0, 50, 100])
     ax.set_ylabel("% of the effect removed")
 
-    # d: amplify the carried state (4-layer model)
+    # d: dose-response of single subcomponents, as weight edits W + (a - 1) u v^T everywhere (4-layer model)
     cv.letter(17.4, top - 0.7, "d")
-    cv.S.text(18.2, top - 0.7, "same model: scale up what the later\ntokens' keys and values carry", fontsize=25, weight="bold",
-              va="center", linespacing=1.15)
-    ax = cv.axes(19.6, y0 + 1.9, 7.4, 7.4)
-    dd = json.load(open(dose4_path))
-    for arm, col, lab in (("state", INK, "all heads"), ("readers", BLUE, "2 reader\nheads")):
-        rows = [r for r in dd[arm] if r["dose"] >= 0]
-        ax.plot([r["dose"] for r in rows], [100 * r["top1"] for r in rows], "-o", color=col, lw=4, ms=10)
-        ax.text(rows[-1]["dose"] + 0.4, 100 * rows[-1]["top1"], lab, color=col, fontsize=22, va="center", weight="bold")
-    ax.axhline(2, color=SLATE, lw=1.6, ls=(0, (4, 3)))
-    ax.text(8, 4.5, "chance", color=SLATE, fontsize=20, ha="right")
+    cv.S.text(18.2, top - 0.7, "same model: scale one VPD subcomponent\nin the weights (0 = deleted, 1 = unchanged)",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    ax = cv.axes(19.6, y0 + 1.9, 6.6, 7.4)
+    ds = json.load(open(dosesub_path))
+    show = {"h.3.attn.q_proj#334": (CORAL, "layer-3 query #334"), "h.2.attn.k_proj#224": (BLUE, "layer-2 key #224")}
+    for key, rows in ds.items():
+        a = [r["dose"] for r in rows]
+        y = [r["raise"] for r in rows]
+        col, lab = show.get(key, (CLOUD, None))
+        ax.plot(a, y, "-o", color=col, lw=4 if lab else 2.5, ms=9 if lab else 5, zorder=3 if lab else 2)
+        if lab:
+            ax.text(a[-1] + 0.3, y[-1], lab.replace(" #", "\n#"), color=col, fontsize=20, va="center", weight="bold")
     ax.axvline(1, color=SLATE, lw=1.2, ls=(0, (4, 3)))
-    ax.set_xlim(-0.4, 11.5)
+    ax.axhline(0, color=SLATE, lw=1.2)
+    ax.set_xlim(-0.4, 11.8)
     ax.set_xticks([0, 1, 4, 8])
-    ax.set_xlabel("scale (1 = as retained)")
-    ax.set_ylabel("hidden word named first (%)")
+    ax.set_xlabel("strength of the subcomponent")
+    ax.set_ylabel("effect of the hidden word (nats)")
 
 
 def main():
@@ -229,13 +232,13 @@ def main():
     ap.add_argument("--results", nargs="+", required=True)
     ap.add_argument("--pd4l", required=True)
     ap.add_argument("--text4l", help="fourlayer/hidden_span.py output: the same three conditions in text, 4-layer model")
-    ap.add_argument("--dose4l", required=True)
+    ap.add_argument("--dosesub", required=True, help="fourlayer/dose_sub.py output")
     ap.add_argument("--out", default="paper/figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1], a.text4l)
-    row_mechanism(cv, a.pd4l, a.dose4l, 0)
+    row_mechanism(cv, a.pd4l, a.dosesub, 0)
     cv.S.plot([0.3, W - 0.3], [ROWS[1], ROWS[1]], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=110)
 
