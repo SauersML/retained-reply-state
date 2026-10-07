@@ -13,7 +13,8 @@ at the last cue token only).
 Held out: the templates whose frame and middle were both unused in training, and edit_eval.py's Pile rows 2048-2063
 (training uses rows 0-63).  The hand-picked edits of edit_sweep.json are evaluated on the same split.
 With --support PATH:INDEX --k K,...: for each K, a fresh fit in which only the K largest subcomponents of that saved
-edit may move (the fewest subcomponents that reach a given recall at a given cost).
+edit may move (the fewest subcomponents that reach a given recall at a given cost).  With --ablate PATH:K, the saved
+refit of support K is evaluated whole and with each of its subcomponents left out.
 """
 import argparse
 import itertools
@@ -59,6 +60,8 @@ def main():
     ap.add_argument("--threads", type=int, default=8)
     ap.add_argument("--support", default="", help="PATH:INDEX: refit only the K largest subcomponents of that saved edit")
     ap.add_argument("--k", default="", help="with --support: the support sizes K to refit, comma separated")
+    ap.add_argument("--ablate", default="", help="PATH:K: the saved refit with support K, evaluated whole and with each of its "
+                                                 "subcomponents left out (factor set back to 1)")
     a = ap.parse_args()
     torch.manual_seed(0)
     torch.set_num_threads(a.threads)
@@ -199,6 +202,33 @@ def main():
         show(spec, out["hand_picked"][spec])
     DELTA.clear()
     json.dump(out, open(a.out, "w"), indent=1)
+
+    if a.ablate:                                  # which subcomponents of a saved edit carry its effect
+        path, k = a.ablate.rsplit(":", 1)
+        edit = next(o for o in json.load(open(path))["optimized"] if o.get("support_k") == int(k))["scales"]
+
+        def apply(scales):
+            DELTA.clear()
+            for key, f in scales.items():
+                site, i = key.split("#")
+                DELTA.setdefault(site, torch.zeros(U[site].shape[0]))[int(i)] = f - 1
+
+        apply(edit)
+        out["ablate"] = {"source": a.ablate, "scales": edit, "whole": evaluate(), "left_out": {}}
+        show(f"edit of {len(edit)} subcomponents", out["ablate"]["whole"])
+        out["ablate"]["site_left_out"] = {}
+        for site in sorted({key.split("#")[0] for key in edit}):     # each weight matrix's share of the edit left out
+            apply({kk: f for kk, f in edit.items() if kk.split("#")[0] != site})
+            out["ablate"]["site_left_out"][site] = evaluate()
+            show(f"    without its {site} subcomponents", out["ablate"]["site_left_out"][site])
+            json.dump(out, open(a.out, "w"), indent=1)
+        for key in edit:
+            apply({kk: f for kk, f in edit.items() if kk != key})
+            out["ablate"]["left_out"][key] = evaluate()
+            show(f"    without {key} (x{edit[key]:.2f})", out["ablate"]["left_out"][key])
+            json.dump(out, open(a.out, "w"), indent=1)
+        DELTA.clear()
+        return
 
     c_batch = torch.arange(len(ANIMALS)).repeat(a.templates)
     out["optimized"] = []
