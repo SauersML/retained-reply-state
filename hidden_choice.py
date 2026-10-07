@@ -35,6 +35,23 @@ TURN1 = ("Here is a list of animals: " + ", ".join(ANIMALS) + ". In your thinkin
          "available. Do not reveal it. Reply with exactly the phrase: \"I understand.\" (Without the quotation marks.)")
 RECALL = ("In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you "
           "now. Which animal did you choose? Answer in exactly this format: Animal: <animal>")
+# a second wording of both turns, to test whether results depend on the phrasing
+TURN1_B = ("You are participating in an experiment about how your internal reasoning relates to your later answers. "
+           "Here is a list of animals: " + ", ".join(ANIMALS) + ". In your internal thinking only, choose one animal from "
+           "this list at random and hold it firmly in mind; later you will be asked to recall it without your thinking "
+           "being available. Do not reveal it in your visible answer. In your final answer for this turn, respond with "
+           "exactly the phrase: \"I understand.\" (Without the quotation marks.)")
+RECALL_B = ("In the preceding turn of this conversation, during your internal thinking, you chose one animal from the "
+            "list. That thinking is not shown to you now. Recall, introspect, or reconstruct which animal you chose, and "
+            "answer in exactly this format: Animal: <animal>")
+WORDINGS = {"A": (TURN1, RECALL), "B": (TURN1_B, RECALL_B)}
+
+
+def prompts(result):
+    """The first-turn and recall prompts a hidden_choice.py result was made with."""
+    return WORDINGS[result.get("wording", "A")]
+
+
 NEUTRAL = "Name one animal from the list above, whichever you like. Answer in exactly this format: Animal: <animal>"
 OPEN = ["Okay, I need to pick one at random.", "Let me choose randomly from the list.", "Alright, a random pick.",
         "I'll just let chance decide.", "Hmm, picking one without overthinking.", "Fine, one animal from the list."]
@@ -51,6 +68,7 @@ def main():
     ap.add_argument("--arms", default="stripped,visible,retained,neutral")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--wording", default="A", choices=sorted(WORDINGS))
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     rng = np.random.default_rng(a.seed)
@@ -61,6 +79,7 @@ def main():
     inv_freq = model.model.rotary_emb.inv_freq.detach().cpu()
     chat = lambda msgs: tok.encode(tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True,
                                                            enable_thinking=True), add_special_tokens=False)
+    TURN1, RECALL = WORDINGS[a.wording]
     prompt = chat([{"role": "user", "content": TURN1}])
     reply = tok.encode("I understand.<|im_end|>", add_special_tokens=False)
     P, R = len(prompt), len(reply)
@@ -111,7 +130,7 @@ def main():
             states.append(torch.stack([h[0, -2].float().cpu() for h in o.hidden_states]).numpy())
         np.save(a.out.replace(".json", "_states.npy"), np.stack(states).astype(np.float16))
 
-        result = {"model": a.model, "animals": ANIMALS, "chosen": [r["animal"] for r in runs],
+        result = {"model": a.model, "wording": a.wording, "animals": ANIMALS, "chosen": [r["animal"] for r in runs],
                   "thinking": [r["thinking"] for r in runs], "arms": {}}
         for arm in a.arms.split(","):
             L = np.zeros((len(runs), len(ANIMALS)))

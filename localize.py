@@ -16,8 +16,8 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from hidden_choice import ANIMALS, RECALL, TURN1
-from kvtools import layers_of, make_cache, score_candidates, shift_keys
+from hidden_choice import ANIMALS, prompts
+from kvtools import layers_of, recall_logp, shift_keys
 from stats import animal_level, raises
 
 
@@ -27,10 +27,13 @@ def main():
     ap.add_argument("--band", type=int, default=4)
     ap.add_argument("--head-layers", default="")
     ap.add_argument("--max-runs", type=int, default=600)
+    ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--only", default="", help="comma-separated arm kinds to run: layers, token, head")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     d = json.load(open(a.result))
+    TURN1, RECALL = prompts(d)
     tok = AutoTokenizer.from_pretrained(d["model"])
     model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=torch.bfloat16, device_map=a.device,
                                                  attn_implementation="sdpa").eval()
@@ -86,16 +89,10 @@ def main():
         results = {}
         t0 = time.time()
         for name, (kind, sel, h) in arms.items():
-            L = np.zeros((n, len(ANIMALS)))
-            for i in range(n):
-                o = model(torch.tensor([suffix], device=a.device),
-                          past_key_values=make_cache([prompt_kv, mixed(i, kind, sel, h)], a.device), use_cache=True)
-                last = torch.log_softmax(o.logits[0, -1].float(), -1)
-                scores = score_candidates(model, layers_of(o.past_key_values), last, [t for _, t in forms], a.device)
-                best = {}
-                for (c, _), s in zip(forms, scores):
-                    best[c] = np.logaddexp(best.get(c, -np.inf), s)
-                L[i] = [best[c] for c in ANIMALS]
+            if a.only and kind not in a.only.split(","):
+                continue
+            L = np.concatenate([recall_logp(model, prompt_kv, [mixed(i, kind, sel, h) for i in range(s, min(n, s + a.batch))],
+                                            suffix, forms, ANIMALS, a.device) for s in range(0, n, a.batch)])
             z, p = animal_level(L, chosen, np.random.default_rng(0), 5000)
             results[name] = {"raise": float(raises(L, chosen).mean()), "z": float(z), "p": float(p)}
             print(f"{name:28s} raise {results[name]['raise']:+.4f}  animal-level z {z:+.2f}  p {p:.3g}  ({time.time() - t0:.0f}s)", flush=True)

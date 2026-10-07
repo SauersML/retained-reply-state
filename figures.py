@@ -69,5 +69,31 @@ def main(paths):
     plt.close(fig)
 
 
+def localization(path, out):
+    """localize.py / writers.py / weights.py output: one bar per arm, animal-level z of the own-animal raise."""
+    d = json.load(open(path))
+    names = list(d["arms"])
+    z = np.array([d["arms"][k]["z"] for k in names])
+    fig, ax = plt.subplots(figsize=(11, 0.55 * len(names) + 1.8))
+    y = np.arange(len(names))[::-1]
+    ax.barh(y, z, color=[COLORS[0] if v > 1.96 else GRAY for v in z], height=0.7)
+    for yi, k in zip(y, names):
+        ax.text(1.03, yi, f"{d['arms'][k]['raise']:+.3f}", va="center", ha="left", fontsize=14,
+                transform=ax.get_yaxis_transform())
+    ax.text(1.03, len(names) - 0.2, "raise (nats)", va="bottom", ha="left", fontsize=14, transform=ax.get_yaxis_transform())
+    ax.axvline(0, color="black", lw=1)
+    ax.axvline(1.96, color=GRAY, ls="--", lw=1.5)
+    ax.set_xlim(min(-2.5, z.min() - 0.5), max(2.5, z.max() + 0.5))
+    ax.set_yticks(y, names, fontsize=15)
+    ax.set_xlabel("animal-level z of the own-animal raise")
+    fig.suptitle(f"{d['model'].split('/')[-1]}: where recall reads the retained reply state", x=0.02, ha="left", fontsize=20)
+    fig.tight_layout(rect=(0, 0, 0.86, 1))
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
-    main(sys.argv[1:] or glob.glob("results/*.json"))
+    if len(sys.argv) == 4 and sys.argv[1] == "--localization":
+        localization(sys.argv[2], sys.argv[3])
+    else:
+        main(sys.argv[1:] or glob.glob("results/*.json"))
