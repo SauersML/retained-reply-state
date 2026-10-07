@@ -7,6 +7,7 @@ edit, on a hidden_choice.py result's runs and thinking texts:
                   (50% = chance; below 50% the answer points away from the hidden animal); two-sided permutation p
   top-1, mean rank of the hidden animal; the own-animal raise (nats)
   damage          KL from the unedited model's next-token distributions on held-out web text (nats per token)
+With --turn1-drop, turn 1 is recomputed without one sentence of its instruction, over the same thinking texts.
 usage: edit_heads.py RESULT.json WINDOWS.u32 --edits "21:0*4;21:5*0,21:6*0;..." --out OUT.json
 """
 import argparse
@@ -29,6 +30,7 @@ def main():
     ap.add_argument("--edits", required=True, help="edits separated by ';', each layer:kv_head*scale pairs, comma separated")
     ap.add_argument("--max-runs", type=int, default=600)
     ap.add_argument("--recall", default=None, choices=["A", "B"], help="ask the recall question of this wording instead")
+    ap.add_argument("--turn1-drop", default=None, help="remove this sentence from turn 1 (the thinking texts are kept)")
     ap.add_argument("--arms", default="retained", help="retained, neutral (any-animal question), visible (thinking kept)")
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--device", default="cuda")
@@ -40,6 +42,9 @@ def main():
     if a.recall:
         from hidden_choice import task
         RECALL = task(a.recall, d.get("items", "animals"))["recall"]
+    if a.turn1_drop:
+        assert a.turn1_drop in TURN1, "the sentence to drop is not in turn 1"
+        TURN1 = TURN1.replace(a.turn1_drop, "")
     tok = AutoTokenizer.from_pretrained(d["model"])
     model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=torch.bfloat16, device_map=a.device,
                                                  attn_implementation="sdpa").eval()
@@ -75,7 +80,7 @@ def main():
         return float(np.mean([(b.float().exp() * (b.float() - x.float())).sum(-1).mean().item() for b, x in zip(base_web, lp)]))
 
     rng = np.random.default_rng(0)
-    res = {"model": d["model"], "runs": n, "edits": {}}
+    res = {"model": d["model"], "runs": n, "turn1_drop": a.turn1_drop, "edits": {}}
     with torch.no_grad():
         base_web = web_logp()
         for spec in ["none"] + a.edits.split(";"):

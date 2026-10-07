@@ -23,21 +23,21 @@ def main():
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     tok = AutoTokenizer.from_pretrained(a.model)
-    model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.float32, device_map="cpu").eval()
+    model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.bfloat16, device_map="cpu").eval()  # stored in bf16; cast per layer
     cfg = model.config
     hd = getattr(cfg, "head_dim", None) or cfg.hidden_size // cfg.num_attention_heads
     group = cfg.num_attention_heads // cfg.num_key_value_heads
     ids = torch.tensor([tok.encode(" " + c.title(), add_special_tokens=False)[0] for c in ANIMALS])
-    U = model.lm_head.weight.detach()[ids]
-    Ug = U * model.model.norm.weight.detach()
-    inputs = {"embedding": model.get_input_embeddings().weight.detach()[ids], "unembedding": U}
+    U = model.lm_head.weight.detach()[ids].float()
+    Ug = U * model.model.norm.weight.detach().float()
+    inputs = {"embedding": model.get_input_embeddings().weight.detach()[ids].float(), "unembedding": U}
     off = ~np.eye(len(ANIMALS), dtype=bool)
     res = {"model": a.model, "heads": {}}
     with torch.no_grad():
         for l, layer in enumerate(model.model.layers):
-            gl = layer.input_layernorm.weight.detach()
-            Wv = layer.self_attn.v_proj.weight.detach()
-            Wo = layer.self_attn.o_proj.weight.detach()
+            gl = layer.input_layernorm.weight.detach().float()
+            Wv = layer.self_attn.v_proj.weight.detach().float()
+            Wo = layer.self_attn.o_proj.weight.detach().float()
             for q in range(cfg.num_attention_heads):
                 h = q // group
                 out = Ug @ Wo[:, q * hd:(q + 1) * hd]

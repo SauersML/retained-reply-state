@@ -18,6 +18,7 @@ import argparse
 import json
 
 import numpy as np
+import scipy.linalg
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -174,13 +175,16 @@ def main():
             fit = fold != f
             for p in heads:
                 M = torch.stack([dv[p][fit & (chosen == c)].mean(0) for c in np.unique(chosen[fit])])
-                basis[(f, p)] = torch.linalg.svd((M - M.mean(0)).double(), full_matrices=False)[2].float()
-        res["subspace_spectrum"] = {f"L{l} kv{h}": [float(s) for s in torch.linalg.svdvals(
-            torch.stack([dv[(l, h)][chosen == c].mean(0) for c in np.unique(chosen)]).double())] for l, h in heads}
+                # SciPy in float64 (the Accelerate LAPACK behind torch.linalg on macOS fails on rank-deficient input)
+                Mc = (M - M.mean(0)).double().numpy()
+                basis[(f, p)] = torch.from_numpy(scipy.linalg.svd(Mc, full_matrices=False)[2]).float()
+        res["subspace_spectrum"] = {f"L{l} kv{h}": [float(s) for s in scipy.linalg.svdvals(
+            torch.stack([dv[(l, h)][chosen == c].mean(0) for c in np.unique(chosen)]).double().numpy())] for l, h in heads}
         for k in ks:
             arms = {"remove top": np.zeros((n, len(ANIMALS))), "remove random": np.zeros((n, len(ANIMALS))),
                     "keep top only": np.zeros((n, len(ANIMALS)))}
-            rand = {p: torch.linalg.qr(torch.randn(hd, k, generator=torch.Generator().manual_seed(k)))[0].T for p in heads}
+            rand = {p: torch.from_numpy(scipy.linalg.qr(np.random.default_rng(k).standard_normal((hd, k)), mode="economic")[0].T).float()
+                    for p in heads}
             def edit(i, arm):
                 out = {}
                 for p in heads:

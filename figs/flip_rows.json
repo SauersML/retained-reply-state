@@ -1,0 +1,19 @@
+[
+ {"group": "heads 5 and 6 deleted", "rows": [
+  {"label": "main data", "path": "results/q17A/q17A_flip_controls_arms.json", "spec": "21:5*0,21:6*0"},
+  {"label": "second seed", "path": "results/q17A/q17A_flip_discovery.json", "spec": "21:5*0,21:6*0"},
+  {"label": "other wording", "path": "results/q17A/q17B_flip_earlier.json", "spec": "21:5*0,21:6*0"},
+  {"label": "model picks the animal", "path": "results/q17A/q17A_free_flip.json", "spec": "21:5*0,21:6*0"},
+  {"label": "countries, not animals", "path": "results/q17A/q17A_countries_flip.json", "spec": "21:5*0,21:6*0"},
+  {"label": "Qwen3-0.6B", "path": "results/q06A/q06A_edit_heads.json", "spec": "21:5*0,21:6*0"}]},
+ {"group": "one head deleted", "rows": [
+  {"label": "head 6", "path": "results/q17A/q17A_flip_other_heads.json", "spec": "21:6*0"},
+  {"label": "head 5", "path": "results/q17A/q17A_flip_other_heads.json", "spec": "21:5*0"}]},
+ {"group": "other heads deleted", "control": true, "rows": [
+  {"label": "layer 21, heads 1, 2", "path": "results/q17A/q17A_flip_other_heads.json", "spec": "21:1*0,21:2*0"},
+  {"label": "layer 21, heads 3, 4", "path": "results/q17A/q17A_flip_other_heads.json", "spec": "21:3*0,21:4*0"},
+  {"label": "layer 20, heads 5, 6", "path": "results/q17A/q17A_flip_other_heads.json", "spec": "20:5*0,20:6*0"},
+  {"label": "layer 22, heads 5, 6", "path": "results/q17A/q17A_flip_other_heads.json", "spec": "22:5*0,22:6*0"}]},
+ {"group": "asked for any animal", "rows": [
+  {"label": "heads 5 and 6 deleted", "path": "results/q17A/q17A_flip_controls_arms.json", "spec": "21:5*0,21:6*0", "arm": "neutral"}]}
+]

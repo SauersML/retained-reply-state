@@ -1,10 +1,13 @@
-"""The main figure.
-  a-b  the experiment: what turn 2's cache holds in each condition, and log P(animal) at recall above its average, per
-       model, for the hidden animal (blue) and for every other animal (gray); last column: the same three conditions in
-       plain text on the 4-layer model (a word, then later tokens, then a cue that repeats the word's frame)
-  c-d  a 4-layer model with a published parameter decomposition: the share of the effect removed by deleting each single
-       subcomponent (fourlayer/pd4l.py), and the effect when one subcomponent's weight is scaled (fourlayer/dose_sub.py)
-usage: figure_main.py --results R.json ... --text4l T.json --pd4l P.json --dosesub S.json
+"""The main figure, three rows.
+  a-b  the experiment, and per model the share of other animals the hidden animal is ranked above at recall (each
+       animal relative to its mean over runs; 50% = chance) in each condition; last column: the same three conditions in
+       plain text on Goodfire's 4-layer model
+  c-e  Qwen3: a linear readout of the reply's state against the model's answer (probe.py); layer 21's value maps from
+       the weights alone (overlap.py, copying.py); deleting heads from the weights, with controls (edit_heads.py)
+  f-g  the 4-layer model: the circuit and three VPD subcomponents that set it (fourlayer/why4l.py, why4l_b.py); weight
+       edits of those subcomponents against damage on Pile text (fourlayer/edit_eval.py)
+usage: figure_main.py --results R.json ... --text4l T.json --probes P.json --overlap O.json --why W.json WB.json
+       --sweep S.json --flip figs/flip_rows.json
 """
 import argparse
 import json
@@ -26,7 +29,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [14.5, 13.0]                        # heights of the two rows
+ROWS = [14.5, 12.5, 12.5]                  # heights of the three rows
 H = sum(ROWS)
 
 
@@ -174,53 +177,133 @@ def row_experiment(cv, paths, y0, text4l=None):
                     va="center", fontsize=21, color=col)
 
 
-def panel_flip(cv, x, y, w, h, flips, controls):
-    """Qwen3-1.7B: discrimination before and after the weight edit, one line per dataset; the control edits in gray.
-    flips: [(label, edit_heads.py output, edit spec)]; controls: (edit_heads.py output, [specs])."""
+def panel_flip(cv, x, y, w, h, groups):
+    """Qwen3: discrimination before (gray dot) and after (arrow head) a weight edit, one line per dataset or edit.
+    groups: [{"group": title, "rows": [{"label", "path" (edit_heads.py output), "spec", "arm" (default retained)}]}];
+    rows whose result is not there yet are left out."""
+    lines = []
+    for g in groups:
+        got = []
+        for r in g["rows"]:
+            try:
+                e = json.load(open(r["path"]))["edits"]
+            except FileNotFoundError:
+                continue
+            arm = r.get("arm", "retained")
+            pick = lambda v: v[arm]["discrimination"] if arm in v else (v["discrimination"] if arm == "retained" else None)
+            if r["spec"] in e and "none" in e and pick(e["none"]) is not None and pick(e[r["spec"]]) is not None:
+                got.append((r["label"], 100 * pick(e["none"]), 100 * pick(e[r["spec"]]), g.get("control", False)))
+        if got:
+            lines.append((g["group"], None, None, None))
+            lines += got
     ax = cv.axes(x, y, w, h)
-    for label, path, spec in flips:
-        try:
-            e = json.load(open(path))["edits"]
-        except (FileNotFoundError, KeyError):
+    yy, ticks, labels = 0.0, [], []
+    for label, a, b, control in lines:
+        if a is None:
+            yy -= 0.35 if ticks else 0
+            ax.text(-0.025, yy, label, transform=ax.get_yaxis_transform(), fontsize=18, color=SLATE, weight="bold",
+                    va="center", ha="right")
+            yy -= 1.0
             continue
-        pick = lambda r: r["retained"]["discrimination"] if "retained" in r else r["discrimination"]
-        if spec not in e or "none" not in e:
-            continue
-        a, b = 100 * pick(e["none"]), 100 * pick(e[spec])
-        ax.plot([0, 1], [a, b], "-o", color=BLUE if b > 50 else SLATE, lw=4, ms=12, zorder=3)
-        ax.text(1.06, b, label, va="center", fontsize=19, color=BLUE if b > 50 else SLATE)
-    cpath, cspecs = controls
-    try:
-        e = json.load(open(cpath))["edits"]
-        for spec in cspecs:
-            if spec in e:
-                b = 100 * (e[spec]["retained"]["discrimination"] if "retained" in e[spec] else e[spec]["discrimination"])
-                a = 100 * (e["none"]["retained"]["discrimination"] if "retained" in e["none"] else e["none"]["discrimination"])
-                ax.plot([0, 1], [a, b], "-o", color=CLOUD, lw=2.5, ms=7, zorder=2)
-    except FileNotFoundError:
-        pass
-    ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
-    ax.set_xlim(-0.25, 1.9)
-    ax.set_ylim(35, 75)
-    ax.set_xticks([0, 1], ["unedited", "two heads'\nweights deleted"])
-    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
+        col = CLOUD if control else (BLUE if b > 50 else CORAL)
+        ax.annotate("", xy=(b, yy), xytext=(a, yy), arrowprops=dict(arrowstyle="-|>", color=col, lw=3.5,
+                                                                      mutation_scale=24, shrinkA=0, shrinkB=0))
+        ax.scatter([a], [yy], s=90, color=SLATE, zorder=3)
+        ticks.append(yy)
+        labels.append(label)
+        yy -= 1.0
+    ax.axvline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
+    ax.set_yticks(ticks, labels, fontsize=18)
+    ax.tick_params(axis="y", length=0)
+    ax.spines["left"].set_visible(False)
+    ax.set_ylim(yy + 0.4, 0.6)
+    ax.set_xlim(35, 80)
+    ax.set_xticks([40, 50, 60, 70, 80])
+    ax.set_xlabel("hidden animal ranked above\nanother animal (%)")
     return ax
 
 
-def row_mechanism(cv, why_paths, sweep_paths, y0, flips=(), controls=("", [])):
+def row_qwen(cv, y0, results, probes, overlap, flip_groups):
     """Panels c-e, occupying [y0, y0 + ROWS[1]]."""
     top = y0 + ROWS[1]
+    # c: what the reply's cache holds against what the answer uses
     cv.letter(0.1, top - 0.7, "c")
-    cv.S.text(0.9, top - 0.7, "Qwen3-1.7B: delete the output weights\nof two layer-21 attention heads", fontsize=25,
+    cv.S.text(0.9, top - 0.7, "Qwen3: the reply's state holds the animal;\nthe answer barely uses it", fontsize=25,
               weight="bold", va="center", linespacing=1.15)
-    panel_flip(cv, 2.4, y0 + 1.9, 4.6, 8.6, flips, controls)
+    ax = cv.axes(2.2, y0 + 1.9, 6.2, 8.4)
+    pr = json.load(open(probes))
+    names = []
+    for k, p in enumerate(results):
+        d = json.load(open(p))
+        size = d["model"].split("-")[-1]
+        names.append(size)
+        L = np.array(d["arms"]["retained"])
+        c = np.array([d["animals"].index(x) for x in d["chosen"]])
+        top1 = 100 * np.mean(L.argmax(1) == c)
+        probe = 100 * max(v["accuracy"] for v in pr[size.lower()].values())
+        ax.plot([k, k], [top1, probe], color=CLOUD, lw=3, zorder=1)
+        ax.scatter([k], [probe], s=320, color=BLUE, zorder=3, edgecolor="white", lw=2)
+        ax.scatter([k], [top1], s=320, color=CORAL, zorder=3, edgecolor="white", lw=2)
+    ax.axhline(2, color=SLATE, lw=1.5, ls=(0, (4, 3)))
+    ax.text(len(results) - 0.55, 5, "chance", color=SLATE, fontsize=18, ha="right")
+    ax.set_xticks(range(len(results)), names)
+    ax.set_xlim(-0.5, len(results) - 0.5)
+    ax.set_ylim(-4, 105)
+    ax.set_ylabel("hidden animal named first (%)")
+    ax.text(1.5, 70, "a linear readout of\nthe reply's state", color=BLUE, fontsize=20, ha="center", va="center")
+    ax.text(1.5, 20, "the model,\nasked at recall", color=CORAL, fontsize=20, ha="center", va="center")
 
-    # d: the 4-layer circuit, three VPD subcomponents that set it (attention measured by fourlayer/why4l.py)
-    cv.letter(8.9, top - 0.7, "d")
-    cv.S.text(9.7, top - 0.7, "Goodfire 4-layer model: three VPD subcomponents\nset how much of the word reaches the cue",
+    # d: the weights of layer 21 (Qwen3-1.7B): three heads read the same directions, with opposite signs
+    cv.letter(9.2, top - 0.7, "d")
+    cv.S.text(10.0, top - 0.7, "Qwen3-1.7B layer 21, weights only: three heads\nread the same directions, write opposite signs",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    ov = json.load(open(overlap))
+    O, g = np.array(ov["overlap"]), np.array(ov["copying_gain"])
+    n = len(O)
+    ax = cv.axes(10.6, y0 + 1.9, 6.0, 7.6)
+    M = O.copy()
+    np.fill_diagonal(M, np.nan)
+    ax.imshow(M, cmap=LinearSegmentedColormap.from_list("w", ["#f7f7f5", INK]), vmin=0, vmax=0.6)
+    for a in range(n):
+        for b in range(n):
+            if a != b and M[a, b] > 0.3:
+                ax.text(b, a, f"{M[a, b]:.2f}", ha="center", va="center", fontsize=15, color="white")
+    ax.set_xticks(range(n), [str(h) for h in range(n)])
+    ax.set_yticks(range(n), [str(h) for h in range(n)])
+    ax.set_xlabel("key/value head")
+    ax.tick_params(length=0)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    gmax = np.abs(g).max()
+    for h in range(n):
+        ax.scatter([n - 0.1], [h], s=60 + 500 * abs(g[h]) / gmax, color=BLUE if g[h] > 0 else CORAL, clip_on=False, zorder=5)
+    ax.text(n - 0.1, -0.95, "copying\ngain", ha="center", va="bottom", fontsize=16, color=SLATE)
+    for h in (0, 5, 6):
+        ax.get_yticklabels()[h].set_weight("bold")
+        ax.get_xticklabels()[h].set_weight("bold")
+    ax.set_xlim(-0.5, n + 0.4)
+
+    # e: deleting the suppressing heads' output weights
+    cv.letter(18.6, top - 0.7, "e")
+    cv.S.text(19.4, top - 0.7, "Qwen3-1.7B: delete heads 5 and 6\nof layer 21 from the weights", fontsize=25,
+              weight="bold", va="center", linespacing=1.15)
+    cv.S.scatter([19.6], [top - 1.75], s=90, color=SLATE)
+    cv.S.text(19.85, top - 1.75, "unedited", fontsize=19, color=SLATE, va="center")
+    cv.S.annotate("", xy=(22.6, top - 1.75), xytext=(21.4, top - 1.75),
+                  arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=3.5, mutation_scale=24))
+    cv.S.text(22.8, top - 1.75, "edited", fontsize=19, color=BLUE, va="center")
+    panel_flip(cv, 22.9, y0 + 2.1, 4.7, 8.0, flip_groups)
+
+
+def row_fourlayer(cv, why_paths, sweep_paths, y0):
+    """Panels f-g, occupying [y0, y0 + ROWS[2]]."""
+    top = y0 + ROWS[2]
+    # f: the 4-layer circuit, three VPD subcomponents that set it (attention measured by fourlayer/why4l.py)
+    cv.letter(0.1, top - 0.7, "f")
+    cv.S.text(0.9, top - 0.7, "Goodfire 4-layer model: three VPD subcomponents\nset how much of the word reaches the cue",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     why, why_b = json.load(open(why_paths[0])), json.load(open(why_paths[1]))["H2"]
-    ax = cv.axes(8.9, y0 + 0.4, 10.6, 9.6)
+    ax = cv.axes(0.6, y0 + 0.4, 14.5, 9.8)
     ax.set_xlim(0, 16)
     ax.set_ylim(0, 10)
     ax.axis("off")
@@ -228,14 +311,14 @@ def row_mechanism(cv, why_paths, sweep_paths, y0, flips=(), controls=("", [])):
     def tok(x, w, text, face, edge, color=INK, style="-"):
         ax.add_patch(FancyBboxPatch((x, yb), w, hb, boxstyle="round,pad=0,rounding_size=0.12", facecolor=face,
                                     edgecolor=edge, lw=2.5, linestyle=style))
-        ax.text(x + w / 2, yb + hb / 2, text, ha="center", va="center", fontsize=20, color=color)
+        ax.text(x + w / 2, yb + hb / 2, text, ha="center", va="center", fontsize=24, color=color)
     tok(0.0, 2.2, "first token", PALE_SLATE, "none")
     tok(2.6, 2.0, "otter", "white", "#e3a1a8", color="#d98b93", style=(0, (4, 3)))
     tok(5.0, 5.0, ". Nobody else knows.", PALE_BLUE, BLUE)
     tok(10.5, 3.7, "My pet is a", PALE_SLATE, "none")
-    ax.text(3.6, 0.6, "not kept", ha="center", fontsize=18, color=RED)
-    ax.text(7.5, 0.6, "cache kept", ha="center", fontsize=18, color=BLUE)
-    ax.text(12.35, 0.6, "cue", ha="center", fontsize=18, color=SLATE)
+    ax.text(3.6, 0.6, "not kept", ha="center", fontsize=22, color=RED)
+    ax.text(7.5, 0.6, "cache kept", ha="center", fontsize=22, color=BLUE)
+    ax.text(12.35, 0.6, "cue", ha="center", fontsize=22, color=SLATE)
     from matplotlib.patches import FancyArrowPatch
     def arr(a, b, width, color, rad):
         ax.add_patch(FancyArrowPatch(a, b, arrowstyle="-|>", mutation_scale=28, lw=width, color=color,
@@ -245,9 +328,9 @@ def row_mechanism(cv, why_paths, sweep_paths, y0, flips=(), controls=("", [])):
     arr((6.8, top_y), (3.9, top_y), 2 + 30 * copy(why["none"]), BLUE, 0.55)
     arr((11.6, top_y), (8.4, top_y), 2 + 30 * why_b["with #334"]["later tokens"], INK, 0.55)
     arr((12.8, top_y), (1.1, top_y), 2 + 30 * why_b["with #334"]["first token"], CLOUD, 0.42)
-    ax.text(5.35, 3.25, "layer 2 copies", ha="center", fontsize=19, color=BLUE, weight="bold")
-    ax.text(10.0, 3.25, "layer 3 reads", ha="center", fontsize=19, color=INK, weight="bold")
-    ax.text(6.95, 4.55, "or the first token", ha="center", fontsize=18, color=SLATE)
+    ax.text(5.35, 3.45, "layer 2 copies", ha="center", va="bottom", fontsize=23, color=BLUE, weight="bold")
+    ax.text(10.0, 3.45, "layer 3 reads", ha="center", va="bottom", fontsize=23, color=INK, weight="bold")
+    ax.text(6.95, 4.15, "or the first token", ha="center", va="center", fontsize=21, color=SLATE)
     # the three dials, each at the token where it acts
     dials = [(3.6, 6.0, BLUE, "key #224", "stronger: more copying", "left"),
              (3.6, 7.9, CORAL, "MLP out #1320", "deleted: more copying", "left"),
@@ -256,14 +339,14 @@ def row_mechanism(cv, why_paths, sweep_paths, y0, flips=(), controls=("", [])):
         ax.plot([dx, dx], [yb + hb + 0.1, dy - 0.4], color=col, lw=1.5, ls=(0, (2, 2)))
         ax.scatter([dx], [dy], s=420, color=col, zorder=5)
         tx, ha = (dx + 0.45, "left") if side == "left" else (dx - 0.45, "right")
-        ax.text(tx, dy + 0.1, name, fontsize=20, color=col, weight="bold", va="center", ha=ha)
-        ax.text(tx, dy - 0.65, what, fontsize=17, color=SLATE, va="center", ha=ha, linespacing=0.95)
+        ax.text(tx, dy + 0.1, name, fontsize=24, color=col, weight="bold", va="center", ha=ha)
+        ax.text(tx, dy - 0.7, what, fontsize=20, color=SLATE, va="center", ha=ha, linespacing=0.95)
 
-    # e: what the edits buy, against damage on other text (fourlayer/edit_eval.py)
-    cv.letter(19.9, top - 0.7, "e")
-    cv.S.text(20.7, top - 0.7, "same model: turn the three\nsubcomponents in the weights", fontsize=25, weight="bold",
-              va="center", linespacing=1.15)
-    ax = cv.axes(21.6, y0 + 1.9, 5.9, 8.6)
+    # g: what the edits buy, against damage on other text (fourlayer/edit_eval.py)
+    cv.letter(16.4, top - 0.7, "g")
+    cv.S.text(17.2, top - 0.7, "same model: turn the three subcomponents\nin the weights, at a cost elsewhere", fontsize=25,
+              weight="bold", va="center", linespacing=1.15)
+    ax = cv.axes(18.6, y0 + 1.9, 8.6, 8.4)
     pts = [(r["pile_kl"], 100 * r["discrimination"]) for path in sweep_paths for spec, r in json.load(open(path)).items()
            if "discrimination" in r]
     xs, ys = np.array([p[0] for p in pts]), np.array([p[1] for p in pts])
@@ -286,20 +369,21 @@ def main():
     ap.add_argument("--results", nargs="+", required=True)
     ap.add_argument("--text4l", nargs="*", default=[],
                     help="fourlayer/hidden_span.py outputs: the same three conditions in text, 4-layer model")
+    ap.add_argument("--probes", required=True, help="probe accuracies per model (probe.py)")
+    ap.add_argument("--overlap", required=True, help="overlap.py output for the layer of the circuit")
     ap.add_argument("--why", nargs=2, required=True, help="fourlayer/why4l.py and why4l_b.py outputs")
     ap.add_argument("--sweep", nargs="+", required=True, help="fourlayer/edit_eval.py outputs")
-    ap.add_argument("--flip", nargs="*", default=[], help="label=edit_heads.json=spec, one per dataset")
-    ap.add_argument("--controls", default="", help="edit_heads.json=spec;spec;... with the control edits")
+    ap.add_argument("--flip", required=True, help="JSON: groups of rows for panel e (see panel_flip)")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
-    flips = [tuple(f.split("=", 2)) for f in a.flip]
-    controls = (a.controls.split("=", 1)[0], a.controls.split("=", 1)[1].split(";")) if a.controls else ("", [])
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
-    row_experiment(cv, a.results, ROWS[1], a.text4l)
-    row_mechanism(cv, a.why, a.sweep, 0, flips, controls)
-    cv.S.plot([0.3, W - 0.3], [ROWS[1], ROWS[1]], color="#e3e5e8", lw=2)
-    fig.savefig(a.out, dpi=110)
+    row_experiment(cv, a.results, ROWS[1] + ROWS[2], a.text4l)
+    row_qwen(cv, ROWS[2], a.results, a.probes, a.overlap, json.load(open(a.flip)))
+    row_fourlayer(cv, a.why, a.sweep, 0)
+    for y in (ROWS[2] + ROWS[1], ROWS[2]):
+        cv.S.plot([0.3, W - 0.3], [y, y], color="#e3e5e8", lw=2)
+    fig.savefig(a.out, dpi=100)
 
 
 if __name__ == "__main__":
