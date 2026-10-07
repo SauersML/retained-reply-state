@@ -210,7 +210,7 @@ def row_experiment(cv, paths, y0, text4l=None):
             lim4, ticks4, pv4 = specs4[name]
             strip(ax4, text4l, name, lim4, ticks4, pv4)
             if name == "visible":
-                ax4.set_xticks(range(len(text4l)), ["unedited", "key #224\n×8"][:len(text4l)], fontsize=20)
+                ax4.set_xticks(range(len(text4l)), [""] * len(text4l), fontsize=20)
                 ax4.set_xlabel("Goodfire 4-layer", fontsize=23, labelpad=6)
         ax = cv.axes(16.2, y - 0.55, 7.4, h + 1.1)
         lim, ticks, pv = specs[name]
@@ -365,23 +365,24 @@ def row_head(cv, y0, flip_groups, npz):
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
 
     cv.letter(19.0, top - 0.75, "e")
-    cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the question:\nraises introspection in Qwen3-1.7B,\nlowers it in Qwen3-0.6B",
+    cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the question:\nraises recall of the hidden animal in\nQwen3-1.7B, lowers it in Qwen3-0.6B",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
     other = "results/q06A/q06A_questions.npz"
     qs = [(npz, "retained", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"), (npz, "recall_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
           (npz, "neutral", "doc_neutral", "1.7B, control:\n\u201cName any\nanimal\u201d"), (other, "retained", "doc_A", "0.6B:\n\u201cWhich\nanimal\u2026?\u201d")]
     qs = [q for q in qs if saved_logp(q[0], f"none|{q[2]}")[0] is not None]
-    ax = cv.axes(20.9, y0 + 2.6, 6.1, 5.9)
+    ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.9)
     panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{q1}")[0], saved_logp(sp, f"none|{q0}")[1])
                       for sp, q0, q1, _ in qs], (15, 102))
     ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([30, 50, 70, 90])
-    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(27.15, y0 + 2.6, 0.2, 5.9))
-    cb.set_label("log2 fold change of each line (d, e)", fontsize=16)
-    cb.ax.tick_params(labelsize=14)
+    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, 5.9))
+    cb.set_ticks([-1, 0, 1], labels=["½×", "1×", "2×"])
+    cb.set_label("change per line (d, e)", fontsize=16, labelpad=2)
+    cb.ax.tick_params(labelsize=17)
     cb.outline.set_visible(False)
 
 
@@ -406,7 +407,7 @@ def row_fourlayer(cv, refits, y0):
                   for o in json.load(open(path)).get("optimized", []))
     base = 100 * json.load(open(refits[0]))["unedited"]["discrimination"]
     cv.letter(13.4, top - 0.75, "g")
-    cv.S.text(14.2, top - 0.75, "Goodfire 4-layer model: rescaling a few of its 9,728 VPD\nsubcomponents (rank-one parts of the weights) raises recall",
+    cv.S.text(14.2, top - 0.75, "Goodfire 4-layer model: rescaling about 50 VPD subcomponents\n(rank-one parts of the weights) raises recall from 64% to 97%",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(16.0, y0 + 1.7, 8.6, 6.9)
     ks = [k for k, _ in rows]
@@ -425,7 +426,7 @@ def row_fourlayer(cv, refits, y0):
     ax.set_xscale("log")
     ax.set_xticks([1, 10, 100, 1000], ["1", "10", "100", "1,000"])
     ax.set_ylim(45, 102)
-    ax.set_xlabel("number of subcomponents rescaled")
+    ax.set_xlabel("number of subcomponents rescaled (of 9,728 searched)")
     ax.set_ylabel("hidden word ranked above\nanother word (%)\non held-out sentences")
 
 

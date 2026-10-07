@@ -11,8 +11,9 @@ writes the hidden animal's opposite", style="rounded,filled,bold", fillcolor="#f
   answer [label="answer", style="rounded,filled,bold", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f", fontsize=21];
   reply -> h0 [color="#b9bfc6", style=dashed, penwidth=2.2, label=" reads"];
   reply -> h6 [color="#b9bfc6", style=dashed, penwidth=2.2, label=" reads"];
-  question -> h6 [color="#e8684a", penwidth=3, label=" makes it read
- 3 times more"];
+  question -> h6 [color="#e8684a", penwidth=3, label=" makes it read the reply
+ 2.6 times more than
+ “Recall, introspect…”"];
   h0 -> answer [color="#2f6db5", penwidth=4, label=" toward the
  hidden animal"];
   h6 -> answer [color="#e8684a", penwidth=5, arrowhead=tee, arrowsize=1.4, label=" away from the
