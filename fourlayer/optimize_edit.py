@@ -12,6 +12,8 @@ Layers 0-1 run once: layer 1's down_proj edit is added from its cached input, an
 at the last cue token only).
 Held out: the templates whose frame and middle were both unused in training, and edit_eval.py's Pile rows 2048-2063
 (training uses rows 0-63).  The hand-picked edits of edit_sweep.json are evaluated on the same split.
+With --support PATH:INDEX --k K,...: for each K, a fresh fit in which only the K largest subcomponents of that saved
+edit may move (the fewest subcomponents that reach a given recall at a given cost).
 """
 import argparse
 import itertools
@@ -55,6 +57,8 @@ def main():
     ap.add_argument("--hand", action="store_true", help="also evaluate the hand-picked edits of edit_sweep.json")
     ap.add_argument("--top-k", default="", help="also evaluate each solution cut to its K largest |s_i| (K,...)")
     ap.add_argument("--threads", type=int, default=8)
+    ap.add_argument("--support", default="", help="PATH:INDEX: refit only the K largest subcomponents of that saved edit")
+    ap.add_argument("--k", default="", help="with --support: the support sizes K to refit, comma separated")
     a = ap.parse_args()
     torch.manual_seed(0)
     torch.set_num_threads(a.threads)
@@ -117,11 +121,12 @@ def main():
         return x + down(1)(g), (g @ V["h.1.mlp.down_proj"] if a.mlp1 else None)
 
     logs = {s: torch.zeros(U[s].shape[0], requires_grad=True) for s in sites}
+    keep = {s: torch.ones(U[s].shape[0]) for s in sites}          # with --support, the subcomponents allowed to move
     DELTA = {}
 
     def tail(x, gv, mask, last):
         if gv is not None:
-            x = x + (gv * torch.expm1(logs["h.1.mlp.down_proj"])) @ U["h.1.mlp.down_proj"]
+            x = x + (gv * torch.expm1(logs["h.1.mlp.down_proj"] * keep["h.1.mlp.down_proj"])) @ U["h.1.mlp.down_proj"]
         for i in (2, 3):
             x = attn(i, x, mask, last and i == 3)
             x = x + down(i)(mlp_in(i, x))
@@ -195,15 +200,29 @@ def main():
     DELTA.clear()
     json.dump(out, open(a.out, "w"), indent=1)
 
-    opt = torch.optim.Adam(list(logs.values()), lr=a.lr)
     c_batch = torch.arange(len(ANIMALS)).repeat(a.templates)
     out["optimized"] = []
-    for lam in [float(x) for x in a.lambdas.split(",")]:
+    rounds = [(float(x), None) for x in a.lambdas.split(",")]
+    if a.support:
+        path, index = a.support.rsplit(":", 1)
+        ranked = list(json.load(open(path))["optimized"][int(index)]["scales"])
+        rounds = [(float(a.lambdas.split(",")[0]), int(k)) for k in a.k.split(",")]
+        out["support"] = a.support
+    opt = torch.optim.Adam(list(logs.values()), lr=a.lr)
+    for lam, k_support in rounds:
+        if k_support is not None:                 # a fresh fit on the K largest subcomponents of the saved edit
+            for s in sites:
+                keep[s].zero_()
+                logs[s].data.zero_()
+            for key in ranked[:k_support]:
+                site, i = key.split("#")
+                keep[site][int(i)] = 1.0
+            opt = torch.optim.Adam(list(logs.values()), lr=a.lr)
         t0 = time.time()
         for step in range(a.steps):
             for s in sites:
                 if s != "h.1.mlp.down_proj":
-                    DELTA[s] = torch.expm1(logs[s])
+                    DELTA[s] = torch.expm1(logs[s] * keep[s])
             z = torch.cat([tail(*train_pre[t], train[t][1]["retained"], True)[:, 0] @ wa.T
                            for t in rng.choice(len(train), a.templates, replace=False)])
             Dz = z - z.mean(0)
@@ -218,7 +237,7 @@ def main():
             with torch.no_grad():
                 lp = torch.log_softmax(pile_base[w] @ wte.T, -1)
             kl = (lp.exp() * (lp - lq)).sum(-1).mean()
-            l1 = sum(v.abs().sum() for v in logs.values())
+            l1 = sum((logs[s] * keep[s]).abs().sum() for s in sites)
             loss = task + lam * kl + a.mu * l1
             opt.zero_grad()
             loss.backward()
@@ -227,6 +246,8 @@ def main():
                 print(f"lambda {lam:g} step {step:4d}  task {task.item():+.4f}  KL {kl.item():.4f}  L1 {l1.item():.2f}  "
                       f"{time.time() - t0:.0f}s", flush=True)
         DELTA.clear()
+        for s in sites:
+            logs[s].data *= keep[s]
         for s in sites:
             DELTA[s] = torch.expm1(logs[s].detach())
         r_dense = evaluate()
@@ -244,7 +265,7 @@ def main():
                 DELTA.setdefault(s, torch.zeros(U[s].shape[0]))[int(i)] = f - 1
             top_k[k] = evaluate()
             show(f"    its top {k}", top_k[k])
-        out["optimized"].append({"lambda": lam, "mu": a.mu, "steps": a.steps, "metrics": r, "metrics_unpruned": r_dense, "n_moved": len(scales),
+        out["optimized"].append({"lambda": lam, "mu": a.mu, "steps": a.steps, "support_k": k_support, "metrics": r, "metrics_unpruned": r_dense, "n_moved": len(scales),
                                  "l1": float(allv.abs().sum()), "scales": scales, "top_k": top_k})
         DELTA.clear()
         show(f"optimized {a.loss} lambda {lam:g} unpruned", r_dense)

@@ -13,6 +13,7 @@ usage: figure_main.py --results R.json ... --text4l T.json --flip figs/flip_rows
 """
 import argparse
 import json
+import os
 
 import matplotlib
 import numpy as np
@@ -27,6 +28,8 @@ from stats import animal_level
 INK, BLUE, PALE_BLUE, CORAL, PALE_CORAL = "#1d1d1f", "#2f6db5", "#dce8f6", "#e8684a", "#fbe3dc"
 SLATE, PALE_SLATE, RED, CLOUD = "#8e959c", "#eceef0", "#c8102e", "#cdd2d7"
 CMAP = LinearSegmentedColormap.from_list("cb", [CORAL, "#f7f7f5", BLUE])
+FC_CMAP = LinearSegmentedColormap.from_list("fc", [CORAL, "#dcdcdc", BLUE])   # log2 fold change of a paired value
+FC_NORM = matplotlib.colors.Normalize(-1, 1)
 plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.facecolor": "white",
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
@@ -77,19 +80,40 @@ def per_animal(L, c, perm=None):
 
 
 def pooled(spec, arm):
-    """Log-probabilities and hidden animals of one condition, pooled over independent sets of runs ("a.json+b.json")."""
+    """Log-probabilities and hidden animals of one condition, pooled over independent sets of runs ("a.json+b.json").
+    Each set is centered on its own mean per animal first, so the comparison stays within a set (sets computed on
+    different hardware differ by rounding)."""
     Ls, cs = [], []
     for path in spec.split("+"):
         d = json.load(open(path))
-        Ls.append(np.array(d["arms"][arm]))
+        L = np.array(d["arms"][arm])
+        Ls.append(L - L.mean(0))
         cs.append(np.array([d["animals"].index(x) for x in d["chosen"]]))
     return np.concatenate(Ls), np.concatenate(cs)
 
 
 def strip(ax, paths, arm, lim, ticks, pvals):
+    strip_data(ax, [pooled(p, arm) for p in paths], lim, ticks, pvals)
+
+
+def p_chance(L, c, own, rng, B=2000):
+    """Two-sided animal-level permutation p of the mean per-animal discrimination against chance."""
+    present = np.unique(c)
+    nulls = np.array([per_animal(L, c, rng.permutation(present)).mean() for _ in range(B)])
+    return (1 + np.sum(np.abs(nulls - 50) >= abs(own.mean() - 50))) / (B + 1)
+
+
+def p_text(ax, x, y, pv, sign, fontsize=21):
+    col = SLATE if pv >= 0.05 else (BLUE if sign > 0 else CORAL)
+    ax.text(x, y, f"p={pv:.1g}" if pv >= 1e-3 else "p<0.001", ha="center", va="top", fontsize=fontsize, color=col,
+            weight="bold" if pv < 0.05 else "normal")
+
+
+def strip_data(ax, data, lim, ticks, pvals):
+    """Per hidden animal, the share of other animals it is ranked above (blue), against the same with the hidden animals
+    re-paired at random (gray); one column per (log P [runs, animals], hidden animal per run)."""
     rng = np.random.default_rng(0)
-    for k, p in enumerate(paths):
-        L, c = pooled(p, arm)
+    for k, (L, c) in enumerate(data):
         own = per_animal(L, c)
         present = np.unique(c)
         null = np.concatenate([per_animal(L, c, rng.permutation(present)) for _ in range(12)])
@@ -98,16 +122,12 @@ def strip(ax, paths, arm, lim, ticks, pvals):
                    lw=0.6, zorder=3, clip_on=False)
         ax.plot([k + 0.03, k + 0.31], [own.mean()] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
         if pvals:
-            nulls = np.array([per_animal(L, c, rng.permutation(present)).mean() for _ in range(2000)])
-            pv = (1 + np.sum(np.abs(nulls - 50) >= abs(own.mean() - 50))) / 2001
-            col = SLATE if pv >= 0.05 else (BLUE if own.mean() > 50 else CORAL)
-            ax.text(k, lim[1] * 0.985, f"p={pv:.1g}" if pv >= 1e-3 else "p<0.001", ha="center", va="top",
-                    fontsize=21, color=col, weight="bold" if pv < 0.05 else "normal")
+            p_text(ax, k, lim[1] * 0.985, p_chance(L, c, own, rng), own.mean() - 50)
     ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=1)
-    ax.set_xlim(-0.55, len(paths) - 0.45)
+    ax.set_xlim(-0.55, len(data) - 0.45)
     ax.set_ylim(*lim)
     ax.set_yticks(ticks)
-    ax.set_xticks(range(len(paths)), [])
+    ax.set_xticks(range(len(data)), [])
 
 
 def row_experiment(cv, paths, y0, text4l=None):
@@ -242,32 +262,40 @@ def panel_switch(cv, x, y, w, h, groups):
     return ax
 
 
-def panel_questions(cv, x, y, w, h, spec):
-    """Discrimination for each question asked in turn 2, original model (outline) and head switched off (filled);
-    bars start at chance.  spec: {"edit", "questions": [{"label", "path", "arm"}]}."""
-    ax = cv.axes(x, y, w, h)
-    for k, q in enumerate(spec["questions"]):
-        e = json.load(open(q["path"]))["edits"]
-        for j, state in enumerate(("none", spec["edit"])):
-            v = 100 * e[state][q["arm"]]["discrimination"]
-            col = BLUE if v > 50 else CORAL
-            xpos = k + (j - 0.5) * 0.38
-            ax.bar(xpos, v - 50, bottom=50, width=0.34, color=col if j else "white", edgecolor=col, lw=3, zorder=2)
-            ax.text(xpos, v + (1.0 if v > 50 else -1.0), f"{v:.0f}", ha="center", va="bottom" if v > 50 else "top",
-                    fontsize=19, color=col)
-    ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)), zorder=1)
-    ax.set_xticks(range(len(spec["questions"])), [q["label"] for q in spec["questions"]], fontsize=18)
-    ax.tick_params(axis="x", length=0)
-    ax.set_xlim(-0.6, len(spec["questions"]) - 0.4)
-    ax.set_ylim(35, 75)
-    ax.set_yticks([40, 50, 60, 70])
-    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
-    ax.text(len(spec["questions"]) - 0.45, 74, "toward the\nhidden animal", ha="right", va="top", fontsize=18, color=BLUE)
-    ax.text(len(spec["questions"]) - 0.45, 36, "away from the\nhidden animal", ha="right", va="bottom", fontsize=18, color=CORAL)
-    return ax
+def p_paired(diff, rng, B=10000):
+    """Two-sided sign-flip p of the mean of paired differences (one per animal or per run)."""
+    signs = rng.choice([-1.0, 1.0], size=(B, len(diff)))
+    return (1 + np.sum(np.abs((signs * diff).mean(1)) >= abs(diff.mean()))) / (B + 1)
 
 
-def row_head(cv, y0, flip_groups, questions, attention):
+def panel_paired(ax, pairs, lim):
+    """Per hidden animal, discrimination in two conditions over the same runs (gray, then blue), joined by a line colored
+    by its log2 fold change; pairs: [(log P first, log P second, hidden animal per run)]; p of the paired difference
+    over animals (sign flips)."""
+    rng = np.random.default_rng(0)
+    for k, (L0, L1, c) in enumerate(pairs):
+        x0, x1 = 3 * k, 3 * k + 1.2
+        o0 = per_animal(L0, c)
+        j = rng.uniform(-0.18, 0.18, o0.size)
+        if L1 is None:                            # the edited model's runs are not in yet
+            ax.scatter(x0 + j, o0, s=55, color=SLATE, edgecolor="white", lw=0.6, zorder=3)
+            ax.plot([x0 - 0.3, x0 + 0.3], [o0.mean()] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
+            continue
+        o1 = per_animal(L1, c)
+        fc = np.log2(o1 / o0)
+        for a_, b_, jj, f in zip(o0, o1, j, fc):
+            ax.plot([x0 + jj, x1 + jj], [a_, b_], color=FC_CMAP(FC_NORM(f)), lw=1.6, zorder=1)
+        ax.scatter(x0 + j, o0, s=55, color=SLATE, edgecolor="white", lw=0.6, zorder=3)
+        ax.scatter(x1 + j, o1, s=55, color=BLUE, edgecolor="white", lw=0.6, zorder=3)
+        for x, o in ((x0, o0), (x1, o1)):
+            ax.plot([x - 0.3, x + 0.3], [o.mean()] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
+        p_text(ax, (x0 + x1) / 2, lim[1] - 1, p_paired(o1 - o0, rng), (o1 - o0).mean())
+    ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
+    ax.set_ylim(*lim)
+    ax.set_xlim(-0.8, 3 * len(pairs) - 0.6)
+
+
+def row_head(cv, y0, flip_groups, npz, attention):
     """Panels c-e, Qwen3-1.7B, occupying [y0, y0 + ROWS[1]]."""
     top = y0 + ROWS[1]
     cv.letter(0.1, top - 0.75, "c")
@@ -280,114 +308,111 @@ def row_head(cv, y0, flip_groups, questions, attention):
     cv.S.text(5.5, top - 2.35, "head switched off (its output weights set to 0)", fontsize=20, color=BLUE, va="center")
     panel_switch(cv, 5.4, y0 + 1.1, 5.6, 6.9, flip_groups)
 
+    # d: per animal, each question, original model and head 21.6 switched off (edit_heads.py --save-logp)
     cv.letter(12.2, top - 0.75, "d")
-    cv.S.text(13.0, top - 0.75, "head 21.6 reduces introspection",
-              fontsize=25, weight="bold", va="center", linespacing=1.15)
-    cv.S.add_patch(plt.Rectangle((13.15, top - 2.55), 0.4, 0.4, facecolor="white", edgecolor=SLATE, lw=2.5))
-    cv.S.text(13.75, top - 2.35, "original model", fontsize=20, color=SLATE, va="center")
-    cv.S.add_patch(plt.Rectangle((16.85, top - 2.55), 0.4, 0.4, facecolor=SLATE, edgecolor=SLATE, lw=2.5))
-    cv.S.text(17.45, top - 2.35, "head 21.6 switched off", fontsize=20, color=SLATE, va="center")
-    panel_questions(cv, 14.6, y0 + 2.6, 6.2, 6.3, questions)
+    cv.S.text(13.0, top - 0.75, "head 21.6 reduces introspection", fontsize=25, weight="bold", va="center")
+    cv.S.scatter([13.2], [top - 1.75], s=110, color=SLATE)
+    cv.S.text(13.45, top - 1.75, "original model", fontsize=20, color=SLATE, va="center")
+    cv.S.scatter([16.2], [top - 1.75], s=110, color=BLUE)
+    cv.S.text(16.45, top - 1.75, "head 21.6 switched off", fontsize=20, color=BLUE, va="center")
+    cv.S.text(13.2, top - 2.45, "each dot: one hidden animal; lines join the same animal", fontsize=18, color=SLATE, va="center")
+    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(20.9, y0 + 2.4, 0.2, 6.1))
+    cb.set_label("log2 fold change\n(switched off / original)", fontsize=17)
+    cb.ax.tick_params(labelsize=15)
+    cb.outline.set_visible(False)
+    z = np.load(npz)
+    c = z["chosen"]
+    edited = all(f"21:6*0|{q}" in z.files for q in ("retained", "recall_B", "neutral"))
+    qs = [("retained", "\u201cWhich animal\ndid you choose?\u201d"), ("recall_B", "\u201cRecall, introspect,\nor reconstruct\u2026\u201d"),
+          ("neutral", "control:\n\u201cName any animal\u201d")]
+    ax = cv.axes(14.4, y0 + 2.4, 6.3, 6.1)
+    panel_paired(ax, [(z[f"none|{q}"], z[f"21:6*0|{q}"] if edited else None, c) for q, _ in qs], (15, 95))
+    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for _, lab in qs], fontsize=18)
+    ax.tick_params(axis="x", length=0)
+    ax.set_yticks([30, 50, 70, 90])
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
 
+    # e: run by run, layer-21 attention to the reply under each recall question (attention_runs.py)
     cv.letter(21.3, top - 0.75, "e")
-    cv.S.text(22.1, top - 0.75, "why: asked “Which animal did\nyou choose?”, head 21.6\nattends more to the reply",
+    cv.S.text(22.1, top - 0.75, "why: asked \u201cWhich animal did\nyou choose?\u201d, head 21.6\nattends more to the reply",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    att = [json.load(open(p)) for p in attention]
-    ax = cv.axes(23.0, y0 + 2.6, 4.6, 6.3)
+    if not os.path.exists(attention):
+        return
+    z = np.load(attention)
+    g = int(z["group"])
+    rng = np.random.default_rng(1)
+    ax = cv.axes(23.0, y0 + 2.4, 4.6, 6.1)
     for k, h in enumerate((6, 0)):
-        for j, (rw, col) in enumerate((("A", CORAL), ("B", BLUE))):
-            vals = [100 * sum(d["kv_heads"][f"21:{h}"]) for d in att if d["recall_wording"] == rw]
-            ax.bar(k + (j - 0.5) * 0.38, np.mean(vals), width=0.34, color=col, zorder=2)
-    ax.set_xticks([0, 1], ["head 21.6\n(pushes away)", "head 21.0\n(pushes toward)"], fontsize=19)
+        vals = {w: 100 * z[w][:, 0, h * g:(h + 1) * g].mean(1) for w in ("A", "B")}
+        for j, (w, col) in enumerate((("A", CORAL), ("B", BLUE))):
+            x = k * 2.2 + j * 0.9
+            ax.scatter(x + rng.uniform(-0.3, 0.3, vals[w].size), vals[w], s=8, color=col, alpha=0.35, edgecolor="none", zorder=2)
+            ax.plot([x - 0.36, x + 0.36], [np.median(vals[w])] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
+        d = vals["A"] - vals["B"]
+        top_y = max(np.quantile(vals["A"], 0.99), np.quantile(vals["B"], 0.99))
+        p_text(ax, k * 2.2 + 0.45, top_y * 1.25, p_paired(d, rng), 1, fontsize=19)
+    ax.set_xticks([0.45, 2.65], ["head 21.6\n(pushes away)", "head 21.0\n(pushes toward)"], fontsize=19)
     ax.tick_params(axis="x", length=0)
     ax.set_ylabel("attention on the reply\nwhile answering (%)")
-    ax.text(1.55, 3.15, "asked “Which animal\ndid you choose?”", color=CORAL, fontsize=18, ha="right", va="top")
-    ax.text(1.55, 2.45, "asked “Recall, introspect,\nor reconstruct…”", color=BLUE, fontsize=18, ha="right", va="top")
-    ax.set_ylim(0, 3.2)
-    ax.set_xlim(-0.55, 1.55)
+    ax.set_yscale("log")
+    ax.text(0.02, 0.02, "asked \u201cWhich animal did you choose?\u201d", color=CORAL, fontsize=17, transform=ax.transAxes, va="bottom")
+    ax.text(0.02, 0.09, "asked \u201cRecall, introspect, or reconstruct\u2026\u201d", color=BLUE, fontsize=17, transform=ax.transAxes, va="bottom")
 
 
-def panel_words(cv, x, y, w, h, path):
-    """Discrimination for turn-2 questions that differ only in their wording, over the same turn-1 caches
-    (edit_heads.py --question); bars start at chance."""
-    e = json.load(open(path))["edits"]["none"]
-    rows = [(None, "opening A: \u201cIn the previous turn you chose one\nanimal from the list in your thinking. \u2026\u201d, then"),
-            ("retained", "\u201cWhich animal did you choose?\u201d"),
-            ("A_recall", "\u201cRecall which animal you chose\u201d"),
-            ("A_introspect", "\u201cIntrospect on which animal you chose\u201d"),
-            ("A_reconstruct", "\u201cReconstruct which animal you chose\u201d"),
-            ("A_all_three", "\u201cRecall, introspect, or reconstruct \u2026\u201d"),
-            (None, "opening B: \u201cIn the preceding turn of this conversation,\nduring your internal thinking, you chose \u2026\u201d, then"),
-            ("B_original", "\u201cRecall, introspect, or reconstruct \u2026\u201d"),
-            ("B_which", "\u201cWhich animal did you choose?\u201d")]
-    ax = cv.axes(x, y, w, h)
-    yy, ticks, labels = 0.0, [], []
-    for arm, label in rows:
-        if arm is None:
-            yy -= 0.4 if ticks else 0
-            ax.text(-0.02, yy - 0.2, label, transform=ax.get_yaxis_transform(), fontsize=18, color=INK, weight="bold",
-                    va="center", ha="right", linespacing=1.05)
-            yy -= 1.4
-            continue
-        if arm not in e:
-            continue
-        v = 100 * e[arm]["discrimination"]
-        col = BLUE if v > 50 else CORAL
-        ax.barh(yy, v - 50, left=50, height=0.66, color=col, zorder=2)
-        ax.text(v + (0.6 if v > 50 else -0.6), yy, f"{v:.0f}", va="center", ha="left" if v > 50 else "right", fontsize=19, color=col)
-        ticks.append(yy)
-        labels.append(label)
-        yy -= 1.0
-    direction_axis(ax, 35, 65)
-    ax.set_yticks(ticks, labels, fontsize=19)
-    ax.tick_params(axis="y", length=0)
-    ax.spines["left"].set_visible(False)
-    ax.set_ylim(yy + 0.4, 0.6)
-    ax.set_xticks([40, 50, 60])
-    ax.set_xlabel("hidden animal ranked above another animal (%)", fontsize=22)
-
-
-def row_fourlayer(cv, optimized, words, y0):
-    """Panels f-g, occupying [y0, y0 + ROWS[2]].  f: weight edits of Goodfire's 4-layer model built from its VPD
-    subcomponents, on held-out templates against KL on held-out Pile text (fourlayer/optimize_edit.py): hand-picked
-    subcomponents, and scales fitted over all subcomponents of layers 1-3 on the other templates."""
+def row_fourlayer(cv, refits, npz, y0):
+    """Panels f-g, occupying [y0, y0 + ROWS[2]].
+    f: Goodfire's 4-layer model, the fewest VPD subcomponents that raise recall: for each K, the scales of only the K
+       largest subcomponents of a fitted edit are fitted again on the training templates; held-out templates and Pile
+       text (fourlayer/optimize_edit.py --support).
+    g: Qwen3-1.7B, per hidden animal, each question alone and after the explainer document (edit_heads.py --question)."""
     top = y0 + ROWS[2]
-    d = json.load(open(optimized))
-    base = 100 * d["unedited"]["discrimination"]
+    rows = sorted((o["support_k"], o["metrics"]) for path in refits if os.path.exists(path)
+                  for o in json.load(open(path)).get("optimized", []))
+    base = 100 * json.load(open(refits[0]))["unedited"]["discrimination"]
     cv.letter(0.1, top - 0.75, "f")
-    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: editing its VPD subcomponents\n(rank-one parts of the weights) raises recall from {base:.0f}%\n"
-              f"to {100 * d['best_at_kl_0.02']['optimized']['discrimination']:.0f}% on held-out templates, at small cost",
+    cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: rescaling a few of its 9,728 VPD\nsubcomponents (rank-one parts of the weights) raises recall",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(2.4, y0 + 1.6, 8.6, 6.9)
-    names = {"h.3.attn.q_proj#334": "query #334", "h.2.attn.k_proj#224": "key #224", "h.1.mlp.down_proj#1320": "MLP out #1320"}
-    word = lambda f: {"0": "removed", "0.5": "halved", "2": "doubled", "4": "\u00d74", "8": "\u00d78"}.get(f, f"\u00d7{f}")
-    hand = [(0.0, base, "")] + [(r["kl"], 100 * r["discrimination"], ", ".join(
-        f"{names[q.split(':')[0]]} {word(q.split(':')[1])}" for q in r["edit"].split(","))) for r in d["hand_picked_frontier"]]
-    hand = [h for h in hand if h[0] <= 0.06]
-    ax.plot([h[0] for h in hand], [h[1] for h in hand], "-o", color=SLATE, lw=3, ms=10, zorder=3)
-    for kl, v, lab in hand[1:]:
-        ax.annotate(lab, (kl, v), xytext=(8, -8), textcoords="offset points", fontsize=16, color=SLATE, va="top")
-    opt = sorted((r["kl"], 100 * r["discrimination"]) for r in d["frontier"] if r["kl"] <= 0.06)
-    ax.plot([0.0] + [o[0] for o in opt], [base] + [o[1] for o in opt], "-o", color=BLUE, lw=3.5, ms=11, zorder=4)
-    ax.text(0.022, 89, "scales fitted over all 9,728\nsubcomponents, on other templates", color=BLUE, fontsize=18, va="center")
-    ax.text(0.031, 61, "hand-picked subcomponents", color=SLATE, fontsize=18, va="center")
-    sparse = next(o for o in d["optimized"] if len(o["scales"]) == 186 and o.get("top_k"))
-    m = sparse["metrics"]
-    ax.scatter([m["pile_kl"]], [100 * m["discrimination"]], s=220, facecolor="white", edgecolor=BLUE, lw=3, zorder=5)
-    ax.annotate("only 186 subcomponents", (m["pile_kl"], 100 * m["discrimination"]), xytext=(14, -14), textcoords="offset points",
-                fontsize=17, color=BLUE, va="top")
-    ax.scatter([0], [base], s=200, color=INK, zorder=6)
-    ax.annotate("unedited", (0, base), xytext=(10, -22), textcoords="offset points", fontsize=17, color=INK)
+    ax = cv.axes(2.4, y0 + 1.7, 9.0, 6.9)
+    ks = [k for k, _ in rows]
+    ds = [100 * m["discrimination"] for _, m in rows]
+    kl = np.array([m["pile_kl"] for _, m in rows])
+    ax.plot(ks, ds, "-", color=CLOUD, lw=2.5, zorder=2)
+    sc = ax.scatter(ks, ds, c=kl, cmap=LinearSegmentedColormap.from_list("kl", ["#d6e4f5", BLUE, INK]),
+                    vmin=0, vmax=max(0.05, float(kl.max())), s=260, edgecolor="white", lw=1.5, zorder=3)
+    cb = cv.fig.colorbar(sc, cax=cv.axes(12.1, y0 + 1.7, 0.25, 6.9))
+    cb.set_label("damage on held-out Pile text\n(KL, nats per token)", fontsize=20)
+    cb.ax.tick_params(labelsize=18)
+    cb.outline.set_visible(False)
+    ax.axhline(base, color=INK, lw=2, ls=(0, (2, 2)))
+    ax.text(300, base + 1.0, f"unedited: {base:.0f}%", fontsize=18, color=INK, va="bottom", ha="center")
     ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
-    ax.set_xlim(-0.002, 0.06)
-    ax.set_ylim(48, 102)
-    ax.set_xlabel("damage to the model on held-out Pile text (KL, nats per token)")
-    ax.set_ylabel("hidden word ranked above\nanother word (%)")
-    if words:
-        cv.letter(13.6, top - 0.75, "g")
-        cv.S.text(14.4, top - 0.75, "Qwen3-1.7B, original model: the result for each wording\nof the recall question, asked over the same caches",
-                  fontsize=25, weight="bold", va="center", linespacing=1.15)
-        panel_words(cv, 21.0, y0 + 1.6, 6.4, 7.0, words)
+    ax.set_xscale("log")
+    ax.set_xticks([1, 10, 100, 1000], ["1", "10", "100", "1,000"])
+    ax.set_ylim(45, 102)
+    ax.set_xlabel("number of subcomponents rescaled")
+    ax.set_ylabel("hidden word ranked above\nanother word (%)\non held-out sentences")
+
+    cv.letter(13.2, top - 0.75, "g")
+    cv.S.text(14.0, top - 0.75, "Qwen3-1.7B: a document about the K/V cache, put before\n\u201cWhich animal did you choose?\u201d, turns the answer toward the hidden animal",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    cv.S.scatter([14.2], [top - 1.85], s=110, color=SLATE)
+    cv.S.text(14.45, top - 1.85, "question alone", fontsize=20, color=SLATE, va="center")
+    cv.S.scatter([17.6], [top - 1.85], s=110, color=BLUE)
+    cv.S.text(17.85, top - 1.85, "document, then the question", fontsize=20, color=BLUE, va="center")
+    z = np.load(npz)
+    c = z["chosen"]
+    qs = [("retained", "doc_A", "\u201cWhich animal\ndid you choose?\u201d"), ("recall_B", "doc_B", "\u201cRecall, introspect,\nor reconstruct\u2026\u201d"),
+          ("neutral", "doc_neutral", "control:\n\u201cName any animal\u201d")]
+    ax = cv.axes(16.9, y0 + 2.4, 9.4, 6.2)
+    panel_paired(ax, [(z[f"none|{q0}"], z[f"none|{q1}"], c) for q0, q1, _ in qs], (15, 95))
+    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for _, _, lab in qs], fontsize=19)
+    ax.tick_params(axis="x", length=0)
+    ax.set_yticks([30, 50, 70, 90])
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
+    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.6, y0 + 2.4, 0.2, 6.2))
+    cb.set_label("log2 fold change", fontsize=17)
+    cb.ax.tick_params(labelsize=15)
+    cb.outline.set_visible(False)
 
 
 def main():
@@ -396,17 +421,16 @@ def main():
     ap.add_argument("--text4l", nargs="*", default=[],
                     help="fourlayer/hidden_span.py outputs: the same three conditions in text, 4-layer model")
     ap.add_argument("--flip", required=True, help="JSON: groups of lines for panel c (see panel_switch)")
-    ap.add_argument("--questions", required=True, help="JSON: the questions of panel d (see panel_questions)")
-    ap.add_argument("--attention", nargs=4, required=True, help="attention.py outputs, both turn-1 by both recall wordings")
-    ap.add_argument("--optimized", required=True, help="fourlayer/optimize_edit.py output")
-    ap.add_argument("--words", default=None, help="edit_heads.py --question output: recall questions differing in their request")
+    ap.add_argument("--questions", required=True, help="edit_heads.py --save-logp output (.npz) with the questions of d and g")
+    ap.add_argument("--attention", required=True, help="attention_runs.py output (.npz)")
+    ap.add_argument("--refit", nargs="+", required=True, help="fourlayer/optimize_edit.py --support outputs")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1] + ROWS[2], a.text4l)
-    row_head(cv, ROWS[2], json.load(open(a.flip)), json.load(open(a.questions)), a.attention)
-    row_fourlayer(cv, a.optimized, a.words, 0)
+    row_head(cv, ROWS[2], json.load(open(a.flip)), a.questions, a.attention)
+    row_fourlayer(cv, a.refit, a.questions, 0)
     for y in (ROWS[2] + ROWS[1], ROWS[2]):
         cv.S.plot([0.3, W - 0.3], [y, y], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=100)

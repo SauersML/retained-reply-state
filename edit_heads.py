@@ -38,6 +38,8 @@ def main():
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--save-logp", action="store_true",
+                    help="also save every run's log P of the 50 names per edit and arm (OUT with .npz), for per-animal plots")
     a = ap.parse_args()
     d = json.load(open(a.result))
     T = task_of(d)
@@ -90,6 +92,7 @@ def main():
 
     rng = np.random.default_rng(0)
     res = {"model": d["model"], "runs": n, "turn1_drop": a.turn1_drop, "edits": {}}
+    saved = {}
     with torch.no_grad():
         base_web = web_logp()
         for spec in ["none"] + [e for e in a.edits.split(";") if e]:
@@ -123,6 +126,8 @@ def main():
             r = {}
             for arm in arms:
                 L = np.concatenate(Ls[arm])
+                if a.save_logp:
+                    saved[f"{spec}|{arm}"] = L.astype(np.float32)
                 present = np.unique(chosen)
                 acc = accuracy(L, chosen)
                 null = np.array([accuracy(L, chosen, rng.permutation(present)) for _ in range(1000)])
@@ -136,6 +141,8 @@ def main():
             print(f"{spec:28s} " + "  ".join(f"{arm}: {100 * r[arm]['discrimination']:5.1f}% (p {r[arm]['p']:.2g}, top-1 "
                                              f"{100 * r[arm]['top1']:.1f}%)" for arm in arms) + f"  web KL {kl:.4f}", flush=True)
             json.dump(res, open(a.out, "w"), indent=1)
+            if a.save_logp:
+                np.savez_compressed(a.out.replace(".json", ".npz"), chosen=chosen, animals=np.array(ANIMALS), **saved)
 
 
 if __name__ == "__main__":
