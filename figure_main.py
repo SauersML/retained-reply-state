@@ -1,6 +1,7 @@
 """The main figure.
   a-b  the experiment: what turn 2's cache holds in each condition, and log P(animal) at recall above its average, per
-       model, for the hidden animal (blue) and for every other animal (gray)
+       model, for the hidden animal (blue) and for every other animal (gray); last column: the same three conditions in
+       plain text on the 4-layer model (a word, then later tokens, then a cue that repeats the word's frame)
   c    Qwen3-1.7B: the weights-only copying gain of every key/value head (copying.py) against its effect when it alone
        keeps the retained reply state (localize.py)
   d-e  a 4-layer model with a published parameter decomposition: the share of the effect removed by deleting each single
@@ -91,7 +92,7 @@ def strip(ax, paths, arm, lim, ticks, pvals):
     ax.set_xticks(range(len(paths)), [])
 
 
-def row_experiment(cv, paths, y0):
+def row_experiment(cv, paths, y0, text4l=None):
     """Rows a-b, occupying [y0, y0 + ROWS[0]]."""
     h = 1.15
     top = y0 + ROWS[0]
@@ -141,16 +142,27 @@ def row_experiment(cv, paths, y0):
              "visible": ((-20, 45), [0, 20, 40], False)}
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
     arrows = {"stripped": (0.01, 0.24, BLUE, "toward"), "visible": (-1, -19, CORAL, "away")}
+    specs4 = {"stripped": ((-0.25, 0.25), [-0.2, 0, 0.2], False),
+              "retained": ((-0.4, 0.75), [0, 0.4], True),
+              "visible": ((-4, 9), [0, 4, 8], False)}
     for (name, _), y in zip(rows, ys):
-        ax = cv.axes(16.2, y - 0.55, 11.0, h + 1.1)
+        if text4l:
+            ax4 = cv.axes(25.6, y - 0.55, 1.9, h + 1.1)
+            lim4, ticks4, pv4 = specs4[name]
+            strip(ax4, [text4l], name, lim4, ticks4, pv4)
+            ax4.set_xlim(-0.5, 0.5)
+            if name == "visible":
+                ax4.set_xticks([0], ["4-layer\n(text)"], fontsize=21)
+        ax = cv.axes(16.2, y - 0.55, 8.4, h + 1.1)
         lim, ticks, pv = specs[name]
         strip(ax, paths, name, lim, ticks, pv)
         if name not in arrows:
             ax.set_ylabel("nats", fontsize=22)
         if name == "visible":
             ax.set_xticks(range(len(paths)), [json.load(open(p))["model"].split("-")[-1] for p in paths])
+            ax.set_xlabel("Qwen3", fontsize=23, labelpad=6)
         if name == "stripped":
-            ax.text(len(paths) / 2 - 0.5, 0.12, "identical in every run, so exactly 0", ha="center", fontsize=21, color=SLATE)
+            ax.text(len(paths) / 2 - 0.5, 0.12, "identical in every run, so exactly 0", ha="center", fontsize=20, color=SLATE)
         if name in arrows:
             y_from, y_to, col, lab = arrows[name]
             ax.annotate("", xy=(-0.105, y_to), xytext=(-0.105, y_from), xycoords=("axes fraction", "data"),
@@ -244,12 +256,13 @@ def main():
     ap.add_argument("--localize", required=True)
     ap.add_argument("--copying", required=True)
     ap.add_argument("--pd4l", required=True)
+    ap.add_argument("--text4l", help="fourlayer/hidden_span.py output: the same three conditions in text, 4-layer model")
     ap.add_argument("--dose4l", required=True)
     ap.add_argument("--out", default="paper/figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
-    row_experiment(cv, a.results, ROWS[1])
+    row_experiment(cv, a.results, ROWS[1], a.text4l)
     row_mechanism(cv, a.localize, a.copying, a.pd4l, a.dose4l, 0)
     cv.S.plot([0.3, W - 0.3], [ROWS[1], ROWS[1]], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=110)
