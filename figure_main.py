@@ -319,7 +319,6 @@ def row_fourlayer(cv, sweep_paths, optimized, y0):
     for kl, d, lab in pts:
         if d > best:
             best, front = d, front + [(kl, d, lab)]
-    ax.scatter([p[0] for p in pts], [p[1] for p in pts], s=80, color=CLOUD, zorder=2)
     ax.plot([p[0] for p in front], [p[1] for p in front], "-o", color=BLUE, lw=3.5, ms=12, zorder=3,
             label="hand-picked subcomponents")
     for kl, d, lab in front:
