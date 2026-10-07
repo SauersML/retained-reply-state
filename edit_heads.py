@@ -109,6 +109,8 @@ def main():
                         Ls[arm].append(np.concatenate([recall_logp(model, empty, [f], suffix, forms, ANIMALS, a.device) for f in fulls]))
                     else:
                         Ls[arm].append(recall_logp(model, prompt_kv, kvs, suffixes[arm], forms, ANIMALS, a.device))
+                if a.device == "mps":
+                    torch.mps.empty_cache()         # the allocator's cache of variable-length blocks otherwise grows past 16 GB
             r = {}
             for arm in arms:
                 L = np.concatenate(Ls[arm])

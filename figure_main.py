@@ -1,13 +1,15 @@
-"""The main figure, three rows.
+"""The main figure, four rows.
   a-b  the experiment, and per model the share of other animals the hidden animal is ranked above at recall (each
        animal relative to its mean over runs; 50% = chance) in each condition; last column: the same three conditions in
        plain text on Goodfire's 4-layer model
   c-e  Qwen3: a linear readout of the reply's state against the model's answer (probe.py); layer 21's value maps from
-       the weights alone (overlap.py, copying.py); deleting heads from the weights, with controls (edit_heads.py)
-  f-g  the 4-layer model: the circuit and three VPD subcomponents that set it (fourlayer/why4l.py, why4l_b.py); weight
+       the weights alone (overlap.py, copying.py); layer 21's attention to the reply at the answer (attention.py)
+  f-g  Qwen3-1.7B: each recall question against each turn-1 wording, unedited and with one head deleted from the
+       weights; the deletion on other data, and other heads deleted (edit_heads.py)
+  h-i  the 4-layer model: the circuit and three VPD subcomponents that set it (fourlayer/why4l.py, why4l_b.py); weight
        edits of those subcomponents against damage on Pile text (fourlayer/edit_eval.py)
 usage: figure_main.py --results R.json ... --text4l T.json --probes P.json --overlap O.json --why W.json WB.json
-       --sweep S.json --flip figs/flip_rows.json
+       --sweep S.json --attention A1.json A2.json A3.json A4.json --cross figs/cross_cells.json --flip figs/flip_rows.json
 """
 import argparse
 import json
@@ -29,7 +31,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [14.5, 12.5, 12.5]                  # heights of the three rows
+ROWS = [14.5, 12.5, 12.5, 12.5]            # heights of the four rows
 H = sum(ROWS)
 
 
@@ -223,7 +225,7 @@ def panel_flip(cv, x, y, w, h, groups):
     return ax
 
 
-def row_qwen(cv, y0, results, probes, overlap, flip_groups):
+def row_qwen(cv, y0, results, probes, overlap, attention):
     """Panels c-e, occupying [y0, y0 + ROWS[1]]."""
     top = y0 + ROWS[1]
     # c: what the reply's cache holds against what the answer uses
@@ -283,23 +285,79 @@ def row_qwen(cv, y0, results, probes, overlap, flip_groups):
         ax.get_xticklabels()[h].set_weight("bold")
     ax.set_xlim(-0.5, n + 0.4)
 
-    # e: deleting the suppressing heads' output weights
+    # e: where layer 21 looks at the answer: attention to the reply's "." under each recall question (attention.py)
     cv.letter(18.6, top - 0.7, "e")
-    cv.S.text(19.4, top - 0.7, "Qwen3-1.7B: delete heads 5 and 6\nof layer 21 from the weights", fontsize=25,
+    cv.S.text(19.4, top - 0.7, "Qwen3-1.7B layer 21 at the answer:\nattention to the reply's \".\"", fontsize=25,
               weight="bold", va="center", linespacing=1.15)
-    cv.S.scatter([19.6], [top - 1.75], s=90, color=SLATE)
-    cv.S.text(19.85, top - 1.75, "unedited", fontsize=19, color=SLATE, va="center")
-    cv.S.annotate("", xy=(22.6, top - 1.75), xytext=(21.4, top - 1.75),
+    att = [json.load(open(p)) for p in attention]
+    ax = cv.axes(20.6, y0 + 1.9, 6.6, 7.6)
+    heads = [0, 5, 6]
+    for k, h in enumerate(heads):
+        for j, (rw, col) in enumerate((("A", CORAL), ("B", BLUE))):
+            vals = [100 * d["kv_heads"][f"21:{h}"][d["reply_tokens"].index(".")] for d in att if d["recall_wording"] == rw]
+            ax.bar(k + (j - 0.5) * 0.36, np.mean(vals), width=0.34, color=col, zorder=2)
+            ax.scatter([k + (j - 0.5) * 0.36] * len(vals), vals, s=40, color=INK, zorder=3)
+    ax.set_xticks(range(len(heads)), ["0\ncopies", "5", "6\nsuppresses"])
+    ax.set_xlabel("key/value head")
+    ax.set_ylabel("attention to \".\" (%)")
+    ax.text(2.0, 1.32, "recall question A", color=CORAL, fontsize=20, ha="right", va="bottom")
+    ax.text(2.0, 1.18, "recall question B", color=BLUE, fontsize=20, ha="right", va="bottom")
+    ax.set_ylim(0, 1.5)
+
+
+def panel_cross(cv, x, y, w, h, cells):
+    """Discrimination for each recall question (and the any-animal question), the turn-1 cache written under either
+    wording, unedited and with one head deleted.  cells: {"A": {question: [path, arm]}, "B": {...}}, the edit spec "edit"."""
+    ax = cv.axes(x, y, w, h)
+    qs = ["A", "B", "neutral"]
+    for t1, marker in (("A", "o"), ("B", "s")):
+        for state, col in (("none", INK), (cells["edit"], BLUE)):
+            ys = []
+            for q in qs:
+                path, arm = cells[t1][q]
+                e = json.load(open(path))["edits"]
+                ys.append(100 * e[state][arm]["discrimination"])
+            ax.plot(range(3), ys, "-", color=col, lw=3.5, zorder=2)
+            ax.scatter(range(3), ys, s=230, marker=marker, color=col, edgecolor="white", lw=2, zorder=3)
+    ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
+    ax.set_xticks(range(3), ["\u201cWhich animal did\nyou choose?\u201d", "\u201cRecall, introspect,\nor reconstruct it\u201d",
+                             "\u201cName any animal\nfrom the list\u201d"], fontsize=21)
+    ax.set_xlim(-0.35, 2.75)
+    ax.set_ylim(35, 80)
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
+    return ax
+
+
+def row_wording(cv, y0, cells, flip_groups):
+    """Panels f-g, occupying [y0, y0 + ROWS[2]]."""
+    top = y0 + ROWS[2]
+    cv.letter(0.1, top - 0.7, "f")
+    cv.S.text(0.9, top - 0.7, "Qwen3-1.7B: the recall question sets the direction,\nthrough one head (layer 21, head 6)",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    ax = panel_cross(cv, 2.2, y0 + 2.1, 9.6, 7.9, cells)
+    ax.text(2.72, 72.5, "head 6 deleted\nfrom the weights", color=BLUE, fontsize=21, ha="right", va="center")
+    ax.text(2.2, 45.5, "unedited", color=INK, fontsize=21, ha="left", va="center")
+    cv.S.scatter([2.6], [top - 1.9], s=200, marker="o", color=SLATE, edgecolor="white")
+    cv.S.text(2.85, top - 1.9, "turn 1 in wording A", fontsize=20, color=SLATE, va="center")
+    cv.S.scatter([6.6], [top - 1.9], s=200, marker="s", color=SLATE, edgecolor="white")
+    cv.S.text(6.85, top - 1.9, "turn 1 in wording B", fontsize=20, color=SLATE, va="center")
+
+    cv.letter(13.6, top - 0.7, "g")
+    cv.S.text(14.4, top - 0.7, "the same deletion on other data,\nand deleting other heads", fontsize=25, weight="bold",
+              va="center", linespacing=1.15)
+    cv.S.scatter([14.6], [top - 1.75], s=90, color=SLATE)
+    cv.S.text(14.85, top - 1.75, "unedited", fontsize=19, color=SLATE, va="center")
+    cv.S.annotate("", xy=(17.6, top - 1.75), xytext=(16.4, top - 1.75),
                   arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=3.5, mutation_scale=24))
-    cv.S.text(22.8, top - 1.75, "edited", fontsize=19, color=BLUE, va="center")
-    panel_flip(cv, 22.9, y0 + 2.1, 4.7, 8.0, flip_groups)
+    cv.S.text(17.8, top - 1.75, "edited", fontsize=19, color=BLUE, va="center")
+    panel_flip(cv, 19.4, y0 + 1.9, 8.0, 8.6, flip_groups)
 
 
 def row_fourlayer(cv, why_paths, sweep_paths, y0):
-    """Panels f-g, occupying [y0, y0 + ROWS[2]]."""
-    top = y0 + ROWS[2]
+    """Panels h-i, occupying [y0, y0 + ROWS[3]]."""
+    top = y0 + ROWS[3]
     # f: the 4-layer circuit, three VPD subcomponents that set it (attention measured by fourlayer/why4l.py)
-    cv.letter(0.1, top - 0.7, "f")
+    cv.letter(0.1, top - 0.7, "h")
     cv.S.text(0.9, top - 0.7, "Goodfire 4-layer model: three VPD subcomponents\nset how much of the word reaches the cue",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     why, why_b = json.load(open(why_paths[0])), json.load(open(why_paths[1]))["H2"]
@@ -343,7 +401,7 @@ def row_fourlayer(cv, why_paths, sweep_paths, y0):
         ax.text(tx, dy - 0.7, what, fontsize=20, color=SLATE, va="center", ha=ha, linespacing=0.95)
 
     # g: what the edits buy, against damage on other text (fourlayer/edit_eval.py)
-    cv.letter(16.4, top - 0.7, "g")
+    cv.letter(16.4, top - 0.7, "i")
     cv.S.text(17.2, top - 0.7, "same model: turn the three subcomponents\nin the weights, at a cost elsewhere", fontsize=25,
               weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(18.6, y0 + 1.9, 8.6, 8.4)
@@ -373,15 +431,18 @@ def main():
     ap.add_argument("--overlap", required=True, help="overlap.py output for the layer of the circuit")
     ap.add_argument("--why", nargs=2, required=True, help="fourlayer/why4l.py and why4l_b.py outputs")
     ap.add_argument("--sweep", nargs="+", required=True, help="fourlayer/edit_eval.py outputs")
-    ap.add_argument("--flip", required=True, help="JSON: groups of rows for panel e (see panel_flip)")
+    ap.add_argument("--attention", nargs=4, required=True, help="attention.py outputs, both turn-1 by both recall wordings")
+    ap.add_argument("--cross", required=True, help="JSON: the cells of panel f (see panel_cross)")
+    ap.add_argument("--flip", required=True, help="JSON: groups of rows for panel g (see panel_flip)")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
-    row_experiment(cv, a.results, ROWS[1] + ROWS[2], a.text4l)
-    row_qwen(cv, ROWS[2], a.results, a.probes, a.overlap, json.load(open(a.flip)))
+    row_experiment(cv, a.results, ROWS[1] + ROWS[2] + ROWS[3], a.text4l)
+    row_qwen(cv, ROWS[2] + ROWS[3], a.results, a.probes, a.overlap, a.attention)
+    row_wording(cv, ROWS[3], json.load(open(a.cross)), json.load(open(a.flip)))
     row_fourlayer(cv, a.why, a.sweep, 0)
-    for y in (ROWS[2] + ROWS[1], ROWS[2]):
+    for y in (ROWS[3] + ROWS[2] + ROWS[1], ROWS[3] + ROWS[2], ROWS[3]):
         cv.S.plot([0.3, W - 0.3], [y, y], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=100)
 

@@ -1,5 +1,35 @@
 [
  {
+  "group": "head 6 deleted",
+  "rows": [
+   {
+    "label": "main data",
+    "path": "results/q17A/q17A_flip_other_heads.json",
+    "spec": "21:6*0"
+   },
+   {
+    "label": "without “Do not reveal it.”",
+    "path": "results/q17A/q17A_noreveal.json",
+    "spec": "21:6*0"
+   },
+   {
+    "label": "model picks the animal",
+    "path": "results/q17A/q17A_free_flip.json",
+    "spec": "21:6*0"
+   },
+   {
+    "label": "countries, not animals",
+    "path": "results/q17A/q17A_countries_flip.json",
+    "spec": "21:6*0"
+   },
+   {
+    "label": "Qwen3-0.6B",
+    "path": "results/q06A/q06A_motif.json",
+    "spec": "21:6*0"
+   }
+  ]
+ },
+ {
   "group": "heads 5 and 6 deleted",
   "rows": [
    {
@@ -13,21 +43,6 @@
     "spec": "21:5*0,21:6*0"
    },
    {
-    "label": "other wording",
-    "path": "results/q17A/q17B_flip_earlier.json",
-    "spec": "21:5*0,21:6*0"
-   },
-   {
-    "label": "model picks the animal",
-    "path": "results/q17A/q17A_free_flip.json",
-    "spec": "21:5*0,21:6*0"
-   },
-   {
-    "label": "countries, not animals",
-    "path": "results/q17A/q17A_countries_flip.json",
-    "spec": "21:5*0,21:6*0"
-   },
-   {
     "label": "Qwen3-0.6B",
     "path": "results/q06A/q06A_edit_heads.json",
     "spec": "21:5*0,21:6*0"
@@ -35,24 +50,14 @@
   ]
  },
  {
-  "group": "one head deleted",
-  "rows": [
-   {
-    "label": "head 6",
-    "path": "results/q17A/q17A_flip_other_heads.json",
-    "spec": "21:6*0"
-   },
-   {
-    "label": "head 5",
-    "path": "results/q17A/q17A_flip_other_heads.json",
-    "spec": "21:5*0"
-   }
-  ]
- },
- {
   "group": "other heads deleted",
   "control": true,
   "rows": [
+   {
+    "label": "layer 21, head 5",
+    "path": "results/q17A/q17A_flip_other_heads.json",
+    "spec": "21:5*0"
+   },
    {
     "label": "layer 21, heads 1, 2",
     "path": "results/q17A/q17A_flip_other_heads.json",
@@ -82,17 +87,6 @@
     "label": "layer 26, heads 0, 7",
     "path": "results/q17A/q17A_motif26.json",
     "spec": "26:0*0,26:7*0"
-   }
-  ]
- },
- {
-  "group": "asked for any animal",
-  "rows": [
-   {
-    "label": "heads 5 and 6 deleted",
-    "path": "results/q17A/q17A_flip_controls_arms.json",
-    "spec": "21:5*0,21:6*0",
-    "arm": "neutral"
    }
   ]
  }
