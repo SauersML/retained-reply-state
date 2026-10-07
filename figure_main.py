@@ -179,7 +179,7 @@ def row_mechanism(cv, pd_path, dose4_path, y0):
              "h.3.attn.k_proj", "h.3.attn.v_proj", "h.3.attn.q_proj", "h.3.attn.o_proj"]
     names = {"k_proj": "key", "v_proj": "value", "q_proj": "query", "o_proj": "output"}
     cv.letter(0.1, top - 0.7, "c")
-    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model, VPD decomposition:\ndelete one subcomponent from the weights",
+    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model: delete one VPD subcomponent\n(one rank-one piece of one attention weight matrix; each dot is one)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(2.2, y0 + 1.9, 13.6, 7.4)
     rng = np.random.default_rng(0)
@@ -207,11 +207,11 @@ def row_mechanism(cv, pd_path, dose4_path, y0):
 
     # d: amplify the carried state (4-layer model)
     cv.letter(17.4, top - 0.7, "d")
-    cv.S.text(18.2, top - 0.7, "same model:\namplify the carried state", fontsize=25, weight="bold", va="center",
-              linespacing=1.15)
+    cv.S.text(18.2, top - 0.7, "same model: scale up what the later\ntokens' keys and values carry", fontsize=25, weight="bold",
+              va="center", linespacing=1.15)
     ax = cv.axes(19.6, y0 + 1.9, 7.4, 7.4)
     dd = json.load(open(dose4_path))
-    for arm, col, lab in (("state", INK, "all"), ("readers", BLUE, "2 heads")):
+    for arm, col, lab in (("state", INK, "all heads"), ("readers", BLUE, "2 reader\nheads")):
         rows = [r for r in dd[arm] if r["dose"] >= 0]
         ax.plot([r["dose"] for r in rows], [100 * r["top1"] for r in rows], "-o", color=col, lw=4, ms=10)
         ax.text(rows[-1]["dose"] + 0.4, 100 * rows[-1]["top1"], lab, color=col, fontsize=22, va="center", weight="bold")
@@ -220,7 +220,7 @@ def row_mechanism(cv, pd_path, dose4_path, y0):
     ax.axvline(1, color=SLATE, lw=1.2, ls=(0, (4, 3)))
     ax.set_xlim(-0.4, 11.5)
     ax.set_xticks([0, 1, 4, 8])
-    ax.set_xlabel("× the carried state")
+    ax.set_xlabel("scale (1 = as retained)")
     ax.set_ylabel("hidden word named first (%)")
 
 
