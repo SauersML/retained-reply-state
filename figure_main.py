@@ -75,12 +75,20 @@ def per_animal(L, c, perm=None):
     return np.array([acc[c == a].mean() for a in present]) * 100
 
 
+def pooled(spec, arm):
+    """Log-probabilities and hidden animals of one condition, pooled over independent sets of runs ("a.json+b.json")."""
+    Ls, cs = [], []
+    for path in spec.split("+"):
+        d = json.load(open(path))
+        Ls.append(np.array(d["arms"][arm]))
+        cs.append(np.array([d["animals"].index(x) for x in d["chosen"]]))
+    return np.concatenate(Ls), np.concatenate(cs)
+
+
 def strip(ax, paths, arm, lim, ticks, pvals):
     rng = np.random.default_rng(0)
     for k, p in enumerate(paths):
-        d = json.load(open(p))
-        L = np.array(d["arms"][arm])
-        c = np.array([d["animals"].index(x) for x in d["chosen"]])
+        L, c = pooled(p, arm)
         own = per_animal(L, c)
         present = np.unique(c)
         null = np.concatenate([per_animal(L, c, rng.permutation(present)) for _ in range(12)])
@@ -167,7 +175,7 @@ def row_experiment(cv, paths, y0, text4l=None):
         if name not in arrows:
             ax.set_ylabel("%", fontsize=22)
         if name == "visible":
-            ax.set_xticks(range(len(paths)), ["Qwen3\n" + json.load(open(p))["model"].split("-")[-1] for p in paths])
+            ax.set_xticks(range(len(paths)), ["Qwen3\n" + json.load(open(p.split("+")[0]))["model"].split("-")[-1] for p in paths])
         if name == "stripped":
             ax.text(len(paths) / 2 - 0.5, 68, "identical in every run, so exactly chance", ha="center", fontsize=20, color=SLATE)
         if name in arrows:
@@ -380,7 +388,7 @@ def row_fourlayer(cv, sweep_paths, optimized, words, y0):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--results", nargs="+", required=True)
+    ap.add_argument("--results", nargs="+", required=True, help="hidden_choice.py outputs, one per model; join sets of runs with +")
     ap.add_argument("--text4l", nargs="*", default=[],
                     help="fourlayer/hidden_span.py outputs: the same three conditions in text, 4-layer model")
     ap.add_argument("--flip", required=True, help="JSON: groups of lines for panel c (see panel_switch)")
