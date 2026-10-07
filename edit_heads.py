@@ -8,6 +8,7 @@ edit, on a hidden_choice.py result's runs and thinking texts:
   top-1, mean rank of the hidden animal; the own-animal raise (nats)
   damage          KL from the unedited model's next-token distributions on held-out web text (nats per token)
 With --turn1-drop, turn 1 is recomputed without one sentence of its instruction, over the same thinking texts.
+With --question NAME=TEXT, further turn-2 questions are asked over the same caches.
 usage: edit_heads.py RESULT.json WINDOWS.u32 --edits "21:0*4;21:5*0,21:6*0;..." --out OUT.json
 """
 import argparse
@@ -27,10 +28,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("result")
     ap.add_argument("windows")
-    ap.add_argument("--edits", required=True, help="edits separated by ';', each layer:kv_head*scale pairs, comma separated")
+    ap.add_argument("--edits", default="", help="edits separated by ';', each layer:kv_head*scale pairs, comma separated")
     ap.add_argument("--max-runs", type=int, default=600)
     ap.add_argument("--recall", default=None, choices=["A", "B"], help="ask the recall question of this wording instead")
     ap.add_argument("--turn1-drop", default=None, help="remove this sentence from turn 1 (the thinking texts are kept)")
+    ap.add_argument("--question", action="append", default=[],
+                    help="NAME=TEXT: also ask this turn-2 question over the same caches, reported as arm NAME")
     ap.add_argument("--arms", default="retained", help="retained, neutral (any-animal question), visible (thinking kept)")
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--device", default="cuda")
@@ -64,6 +67,12 @@ def main():
     full_n = chat([{"role": "user", "content": TURN1}, {"role": "assistant", "content": "I understand."},
                    {"role": "user", "content": NEUTRAL}])
     suffixes = {"retained": suffix, "neutral": full_n[P + R:] + answer, "visible": suffix}
+    for q in a.question:
+        name, text = q.split("=", 1)
+        full_q = chat([{"role": "user", "content": TURN1}, {"role": "assistant", "content": "I understand."},
+                       {"role": "user", "content": text}])
+        assert full_q[:P + R] == prompt + reply, "chat template does not keep the turn-1 prefix"
+        suffixes[name] = full_q[P + R:] + answer
     forms = [(c, tok.encode(f, add_special_tokens=False)) for c in ANIMALS for f in (" " + c.title(), " " + c)]
     chosen = np.array([ANIMALS.index(x) for x in d["chosen"]])[: a.max_runs]
     thinks = [tok.encode("<think>\n" + th + "\n</think>\n\n", add_special_tokens=False) for th in d["thinking"][: a.max_runs]]
@@ -83,7 +92,7 @@ def main():
     res = {"model": d["model"], "runs": n, "turn1_drop": a.turn1_drop, "edits": {}}
     with torch.no_grad():
         base_web = web_logp()
-        for spec in ["none"] + a.edits.split(";"):
+        for spec in ["none"] + [e for e in a.edits.split(";") if e]:
             for l, W in original.items():
                 model.model.layers[l].self_attn.o_proj.weight.copy_(W)
             if spec != "none":
@@ -94,7 +103,7 @@ def main():
                     W[:, h * group * hd:(h + 1) * group * hd] *= float(scale)
             clean = layers_of(model(torch.tensor([prompt], device=a.device), use_cache=True).past_key_values)
             prompt_kv = [(k.cpu(), v.cpu()) for k, v in clean]
-            arms = a.arms.split(",")
+            arms = a.arms.split(",") + [q.split("=", 1)[0] for q in a.question]
             Ls = {arm: [] for arm in arms}
             for s in range(0, n, a.batch):
                 kvs, fulls = [], []

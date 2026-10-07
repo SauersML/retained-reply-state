@@ -149,10 +149,10 @@ def row_experiment(cv, paths, y0, text4l=None):
     cv.S.text(22.6, top - 1.75, "another animal was hidden", fontsize=22, color=SLATE, va="center")
     specs = {"stripped": ((18, 80), [30, 50, 70], False),
              "retained": ((18, 80), [30, 50, 70], True),
-             "visible": ((18, 105), [50, 100], False)}
+             "visible": ((0, 105), [0, 50, 100], False)}
     specs4 = specs
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
-    arrows = {"stripped": (51, 78, BLUE, "toward"), "visible": (49, 27, CORAL, "away")}
+    arrows = {"stripped": (51, 78, BLUE, "toward"), "visible": (49, 6, CORAL, "away")}
     for (name, _), y in zip(rows, ys):
         if text4l:
             ax4 = cv.axes(24.4, y - 0.55, 3.2, h + 1.1)
@@ -298,13 +298,49 @@ def row_head(cv, y0, flip_groups, questions, attention):
     ax.set_xlim(-0.55, 1.55)
 
 
-def row_fourlayer(cv, sweep_paths, optimized, y0):
+def panel_words(cv, x, y, w, h, path):
+    """Discrimination for turn-2 questions that differ only in their final request, over the same turn-1 caches
+    (edit_heads.py --question); bars start at chance."""
+    e = json.load(open(path))["edits"]["none"]
+    rows = [("retained", "\u201cWhich animal did you choose?\u201d"),
+            ("A_recall", "\u201cRecall which animal you chose\u201d"),
+            ("A_introspect", "\u201cIntrospect on which animal you chose\u201d"),
+            ("A_reconstruct", "\u201cReconstruct which animal you chose\u201d"),
+            ("A_all_three", "\u201cRecall, introspect, or reconstruct which\nanimal you chose\u201d"),
+            (None, None),
+            ("B_original", "question B as written"),
+            ("B_which", "question B ending \u201cWhich animal did\nyou choose?\u201d")]
+    ax = cv.axes(x, y, w, h)
+    yy, ticks, labels = 0.0, [], []
+    for arm, label in rows:
+        if arm is None:
+            yy -= 0.5
+            continue
+        if arm not in e:
+            continue
+        v = 100 * e[arm]["discrimination"]
+        col = BLUE if v > 50 else CORAL
+        ax.barh(yy, v - 50, left=50, height=0.66, color=col, zorder=2)
+        ax.text(v + (0.6 if v > 50 else -0.6), yy, f"{v:.0f}", va="center", ha="left" if v > 50 else "right", fontsize=19, color=col)
+        ticks.append(yy)
+        labels.append(label)
+        yy -= 1.0
+    direction_axis(ax, 35, 70)
+    ax.set_yticks(ticks, labels, fontsize=19)
+    ax.tick_params(axis="y", length=0)
+    ax.spines["left"].set_visible(False)
+    ax.set_ylim(yy + 0.4, 0.6)
+    ax.set_xticks([40, 50, 60, 70])
+    ax.set_xlabel("hidden animal ranked above another animal (%)", fontsize=22)
+
+
+def row_fourlayer(cv, sweep_paths, optimized, words, y0):
     """Panel f, occupying [y0, y0 + ROWS[2]]: the cheapest VPD-subcomponent weight edits of Goodfire's 4-layer model."""
     top = y0 + ROWS[2]
     cv.letter(0.1, top - 0.75, "f")
-    cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: the cheapest weight edits that raise recall, built from its VPD\n"
-              "subcomponents (rank-one parts of the weights)", fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(2.4, y0 + 1.6, 11.0, 7.6)
+    cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: the cheapest weight edits that raise\nrecall, built from its VPD subcomponents (rank-one parts\nof the weights)",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    ax = cv.axes(2.4, y0 + 1.6, 8.6, 6.9)
     names = {"h.3.attn.q_proj#334": "query #334", "h.2.attn.k_proj#224": "key #224", "h.1.mlp.down_proj#1320": "MLP out #1320"}
     word = lambda f: {"0": "removed", "0.5": "halved", "2": "doubled", "4": "×4", "8": "×8"}.get(f, f"×{f}")
     pts = []
@@ -335,6 +371,11 @@ def row_fourlayer(cv, sweep_paths, optimized, y0):
     ax.set_ylim(48, 75)
     ax.set_xlabel("damage to the model on ordinary Pile text (KL, nats per token)")
     ax.set_ylabel("hidden word ranked above\nanother word (%)")
+    if words:
+        cv.letter(13.6, top - 0.75, "g")
+        cv.S.text(14.4, top - 0.75, "Qwen3-1.7B: which words in the recall question turn the\nanswer toward the hidden animal (same caches, original model)",
+                  fontsize=25, weight="bold", va="center", linespacing=1.15)
+        panel_words(cv, 20.6, y0 + 1.6, 6.6, 6.9, words)
 
 
 def main():
@@ -347,13 +388,14 @@ def main():
     ap.add_argument("--attention", nargs=4, required=True, help="attention.py outputs, both turn-1 by both recall wordings")
     ap.add_argument("--sweep", nargs="+", required=True, help="fourlayer/edit_eval.py outputs")
     ap.add_argument("--optimized", default=None, help="fourlayer/optimize_edit.py output, if there is one")
+    ap.add_argument("--words", default=None, help="edit_heads.py --question output: recall questions differing in their request")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1] + ROWS[2], a.text4l)
     row_head(cv, ROWS[2], json.load(open(a.flip)), json.load(open(a.questions)), a.attention)
-    row_fourlayer(cv, a.sweep, a.optimized, 0)
+    row_fourlayer(cv, a.sweep, a.optimized, a.words, 0)
     for y in (ROWS[2] + ROWS[1], ROWS[2]):
         cv.S.plot([0.3, W - 0.3], [y, y], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=100)
