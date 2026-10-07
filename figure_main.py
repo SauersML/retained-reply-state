@@ -105,7 +105,8 @@ def row_experiment(cv, paths, y0, text4l=None):
     rows = [("stripped", SLATE), ("retained", BLUE), ("visible", CORAL)]
     ys = [y0 + 8.0, y0 + 5.0, y0 + 2.0]
     for (name, col), y in zip(rows, ys):
-        cv.S.text(0.9, y + h / 2, name, fontsize=29, color=col, weight="bold", va="center")
+        label = {"stripped": "reply\nrecomputed", "retained": "reply cache\nkept", "visible": "thinking\nkept"}[name]
+        cv.S.text(0.9, y + h / 2, label, fontsize=25, color=col, weight="bold", va="center", linespacing=1.05)
         x = 3.4
         cv.block(x, y, 1.15, h, PALE_SLATE, "none", "ask", fs=20)
         x += 1.3
@@ -179,7 +180,7 @@ def row_mechanism(cv, pd_path, dosesub_path, y0):
              "h.3.attn.k_proj", "h.3.attn.v_proj", "h.3.attn.q_proj", "h.3.attn.o_proj"]
     names = {"k_proj": "key", "v_proj": "value", "q_proj": "query", "o_proj": "output"}
     cv.letter(0.1, top - 0.7, "c")
-    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model, retained: remove one VPD subcomponent where its\nmatrix acts in this circuit (each dot is one rank-one piece of an attention matrix)",
+    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model, later tokens' cache kept: remove one VPD subcomponent\nwhere its matrix acts in this circuit (each dot is one rank-one piece of an attention matrix)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     # the route: the word reaches the cue only through the tokens after it
     yb, hb = top - 3.15, 0.8
@@ -222,7 +223,7 @@ def row_mechanism(cv, pd_path, dosesub_path, y0):
 
     # d: dose-response of single subcomponents, as weight edits W + (a - 1) u v^T everywhere (4-layer model)
     cv.letter(17.4, top - 0.7, "d")
-    cv.S.text(18.2, top - 0.7, "same model, retained: scale one VPD\nsubcomponent in the weights (0 = deleted)",
+    cv.S.text(18.2, top - 0.7, "same model and condition: scale one VPD\nsubcomponent in the weights (0 = deleted)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(19.6, y0 + 1.9, 6.6, 8.6)
     ds = json.load(open(dosesub_path))
