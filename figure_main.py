@@ -280,7 +280,7 @@ def row_head(cv, y0, flip_groups, questions, attention):
     panel_switch(cv, 5.4, y0 + 1.1, 5.6, 6.9, flip_groups)
 
     cv.letter(12.2, top - 0.75, "d")
-    cv.S.text(13.0, top - 0.75, "the two recall questions give opposite results\nwith head 21.6, and the same result without it",
+    cv.S.text(13.0, top - 0.75, "head 21.6 reduces introspection",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     cv.S.add_patch(plt.Rectangle((13.15, top - 2.55), 0.4, 0.4, facecolor="white", edgecolor=SLATE, lw=2.5))
     cv.S.text(13.75, top - 2.35, "original model", fontsize=20, color=SLATE, va="center")
