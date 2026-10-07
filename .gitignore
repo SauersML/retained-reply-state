@@ -1,3 +1,12 @@
 __pycache__/
 *.npy
 *.log
+results/fourlayer/hidden_span_h_3_attn_q_proj_334_0.json
+results/fourlayer/hidden_span_h_1_mlp_down_proj_1320_0.json
+results/q17A/local_done
+results/q17A/motif26_done
+results/q17A/secrecy_done
+results/q17A/validate_done
+results/q17A/rerun_done
+results/q17A/night_done
+results/weights_scipy_done

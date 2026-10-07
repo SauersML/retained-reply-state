@@ -1,0 +1,17 @@
+calibration Qwen/Qwen3-1.7B retained (runs shuffled): p < 0.05 in 0.075 (run level), 0.075 (animal level)
+calibration Qwen/Qwen3-1.7B retained (animals relabelled): p < 0.05 in 0.045 (run level), 0.025 (animal level)
+calibration Qwen/Qwen3-1.7B neutral (runs shuffled): p < 0.05 in 0.040 (run level), 0.045 (animal level)
+calibration Qwen/Qwen3-1.7B neutral (animals relabelled): p < 0.05 in 0.065 (run level), 0.045 (animal level)
+calibration Qwen/Qwen3-1.7B retained (runs shuffled): p < 0.05 in 0.090 (run level), 0.085 (animal level)
+calibration Qwen/Qwen3-1.7B retained (animals relabelled): p < 0.05 in 0.095 (run level), 0.065 (animal level)
+calibration Qwen/Qwen3-1.7B neutral (runs shuffled): p < 0.05 in 0.060 (run level), 0.040 (animal level)
+calibration Qwen/Qwen3-1.7B neutral (animals relabelled): p < 0.05 in 0.060 (run level), 0.050 (animal level)
+model              arm        runs distinct     raise   run z    run p  animal z  animal p    BH q
+Qwen/Qwen3-1.7B    stripped    598      598   +0.0000    +nan      nan      +nan       nan     nan
+Qwen/Qwen3-1.7B    visible     598      598  +32.8130 +136.71    5e-05    +40.43     5e-05     nan
+Qwen/Qwen3-1.7B    retained    598      598   -0.0128   -2.42     0.99     -2.62         1       1
+Qwen/Qwen3-1.7B    neutral     598      598   +0.0060   +1.52    0.064     +1.22      0.11    0.34
+Qwen/Qwen3-1.7B    stripped    599      599   +0.0000    +nan      nan      +nan       nan     nan
+Qwen/Qwen3-1.7B    visible     599      599  +32.4477 +138.42    5e-05    +40.87     5e-05     nan
+Qwen/Qwen3-1.7B    retained    599      599   -0.0259   -4.85        1     -4.86         1       1
+Qwen/Qwen3-1.7B    neutral     599      599   +0.0042   +1.02     0.15     +0.95      0.17    0.34

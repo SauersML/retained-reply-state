@@ -201,7 +201,7 @@ def panel_flip(cv, x, y, w, h, groups):
     for label, a, b, control in lines:
         if a is None:
             yy -= 0.35 if ticks else 0
-            ax.text(-0.025, yy, label, transform=ax.get_yaxis_transform(), fontsize=18, color=SLATE, weight="bold",
+            ax.text(-0.025, yy, label, transform=ax.get_yaxis_transform(), fontsize=20, color=SLATE, weight="bold",
                     va="center", ha="right")
             yy -= 1.0
             continue
@@ -213,7 +213,7 @@ def panel_flip(cv, x, y, w, h, groups):
         labels.append(label)
         yy -= 1.0
     ax.axvline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
-    ax.set_yticks(ticks, labels, fontsize=18)
+    ax.set_yticks(ticks, labels, fontsize=21)
     ax.tick_params(axis="y", length=0)
     ax.spines["left"].set_visible(False)
     ax.set_ylim(yy + 0.4, 0.6)
@@ -245,7 +245,7 @@ def row_qwen(cv, y0, results, probes, overlap, flip_groups):
         ax.scatter([k], [probe], s=320, color=BLUE, zorder=3, edgecolor="white", lw=2)
         ax.scatter([k], [top1], s=320, color=CORAL, zorder=3, edgecolor="white", lw=2)
     ax.axhline(2, color=SLATE, lw=1.5, ls=(0, (4, 3)))
-    ax.text(len(results) - 0.55, 5, "chance", color=SLATE, fontsize=18, ha="right")
+    ax.text(0.5, 5, "chance", color=SLATE, fontsize=18, ha="center")
     ax.set_xticks(range(len(results)), names)
     ax.set_xlim(-0.5, len(results) - 0.5)
     ax.set_ylim(-4, 105)
