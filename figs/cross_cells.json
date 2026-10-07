@@ -1,7 +1,0 @@
-{"edit": "21:6*0",
- "A": {"A": ["results/q17A/q17A_flip_other_heads.json", "retained"],
-       "B": ["results/q17A/q17A_crossed_recallB.json", "retained"],
-       "neutral": ["results/q17A/q17A_crossed_recallB.json", "neutral"]},
- "B": {"A": ["results/q17A/q17B_crossed_recallA.json", "retained"],
-       "B": ["results/q17A/q17B_flip_earlier.json", "retained"],
-       "neutral": ["results/q17A/q17B_flip_earlier.json", "neutral"]}}
