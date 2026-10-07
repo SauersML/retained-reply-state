@@ -2,11 +2,9 @@
   a-b  the experiment: what turn 2's cache holds in each condition, and log P(animal) at recall above its average, per
        model, for the hidden animal (blue) and for every other animal (gray); last column: the same three conditions in
        plain text on the 4-layer model (a word, then later tokens, then a cue that repeats the word's frame)
-  c    Qwen3-1.7B: the weights-only copying gain of every key/value head (copying.py) against its effect when it alone
-       keeps the retained reply state (localize.py)
-  d-e  a 4-layer model with a published parameter decomposition: the share of the effect removed by deleting each single
+  c-d  a 4-layer model with a published parameter decomposition: the share of the effect removed by deleting each single
        subcomponent (fourlayer/pd4l.py), and top-1 recall when the carried state is amplified (fourlayer/dose4l.py)
-usage: figure_main.py --results R.json ... --localize L.json --copying C.json --pd4l P.json --dose4l D4.json
+usage: figure_main.py --results R.json ... --text4l T.json --pd4l P.json --dose4l D4.json
 """
 import argparse
 import json
@@ -170,43 +168,20 @@ def row_experiment(cv, paths, y0, text4l=None):
                     va="center", fontsize=21, color=col)
 
 
-def row_mechanism(cv, loc_path, copy_path, pd_path, dose4_path, y0):
-    """Panels c-e, occupying [y0, y0 + ROWS[1]]."""
+def row_mechanism(cv, pd_path, dose4_path, y0):
+    """Panels c-d, occupying [y0, y0 + ROWS[1]]."""
     top = y0 + ROWS[1]
-    # c: weights predict the sign (Qwen3)
-    loc = json.load(open(loc_path))
-    cp = json.load(open(copy_path))["kv_heads"]
-    heads = {(int(k.split()[1]), int(k.split()[3])): v for k, v in loc["arms"].items()
-             if k.startswith("layer ") and "kv-head" in k}
-    marked = sorted(heads, key=lambda k: -abs(heads[k]["raise"]))[:3]
-    cv.letter(0.1, top - 0.7, "c")
-    cv.S.text(0.9, top - 0.7, f"{loc['model'].split('/')[-1]}, each attention head:\ncopying score from its weights vs. its effect",
-              fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(2.2, y0 + 1.9, 6.6, 7.4)
-    xs = np.array([cp[f"{l}:{h}"]["embedding"] for l, h in heads])
-    ys = np.array([v["raise"] for v in heads.values()])
-    ax.scatter(xs, ys, s=50, color=CLOUD, zorder=2)
-    for k in marked:
-        x, y = cp[f"{k[0]}:{k[1]}"]["embedding"], heads[k]["raise"]
-        col = BLUE if y > 0 else CORAL
-        ax.scatter([x], [y], s=340, color=col, zorder=3, edgecolor="white", lw=2)
-        ax.annotate(f"L{k[0]}·{k[1]}", (x, y), xytext=(14, 0), textcoords="offset points", va="center", fontsize=23,
-                    color=col, weight="bold")
-    ax.axhline(0, color=SLATE, lw=1.2)
-    ax.axvline(0, color=SLATE, lw=1.2)
-    ax.set_xlabel("copying gain, weights only")
-    ax.set_ylabel("effect of the head alone (nats)")
 
-    # d: delete one subcomponent of the decomposition (4-layer model)
+    # c: delete one subcomponent of the decomposition (4-layer model)
     d = json.load(open(pd_path))
     base = d.get("screen_base", 0.2712)
     order = ["h.2.attn.k_proj", "h.2.attn.v_proj", "h.2.attn.q_proj", "h.2.attn.o_proj",
              "h.3.attn.k_proj", "h.3.attn.v_proj", "h.3.attn.q_proj", "h.3.attn.o_proj"]
     names = {"k_proj": "key", "v_proj": "value", "q_proj": "query", "o_proj": "output"}
-    cv.letter(10.2, top - 0.7, "d")
-    cv.S.text(11.0, top - 0.7, "Goodfire's 4-layer Pile model, VPD decomposition:\ndelete one subcomponent from the weights",
+    cv.letter(0.1, top - 0.7, "c")
+    cv.S.text(0.9, top - 0.7, "Goodfire's 4-layer Pile model, VPD decomposition:\ndelete one subcomponent from the weights",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(11.9, y0 + 1.9, 8.2, 7.4)
+    ax = cv.axes(2.2, y0 + 1.9, 13.6, 7.4)
     rng = np.random.default_rng(0)
     for k, site in enumerate(order):
         sd = d["sites"][site]
@@ -223,18 +198,18 @@ def row_mechanism(cv, loc_path, copy_path, pd_path, dose4_path, y0):
             ax.scatter([k], [drops[lo]], s=200, color=CORAL, zorder=3, edgecolor="white", lw=2)
     ax.axhline(0, color=SLATE, lw=1.4, ls=(0, (4, 3)))
     ax.axvline(3.5, color=SLATE, lw=1.2)
-    ax.set_xticks(range(len(order)), [names[s_.split(".")[-1]] for s_ in order], fontsize=18, rotation=90)
+    ax.set_xticks(range(len(order)), [names[s_.split(".")[-1]] for s_ in order], fontsize=21)
     ax.text(1.5, 106, "layer 2", ha="center", fontsize=23, weight="bold")
     ax.text(5.5, 106, "layer 3", ha="center", fontsize=23, weight="bold")
     ax.set_ylim(-110, 118)
     ax.set_yticks([-100, -50, 0, 50, 100])
     ax.set_ylabel("% of the effect removed")
 
-    # e: amplify the carried state (4-layer model)
-    cv.letter(21.0, top - 0.7, "e")
-    cv.S.text(21.8, top - 0.7, "same model:\namplify the carried state", fontsize=25, weight="bold", va="center",
+    # d: amplify the carried state (4-layer model)
+    cv.letter(17.4, top - 0.7, "d")
+    cv.S.text(18.2, top - 0.7, "same model:\namplify the carried state", fontsize=25, weight="bold", va="center",
               linespacing=1.15)
-    ax = cv.axes(22.6, y0 + 1.9, 4.9, 7.4)
+    ax = cv.axes(19.6, y0 + 1.9, 7.4, 7.4)
     dd = json.load(open(dose4_path))
     for arm, col, lab in (("state", INK, "all"), ("readers", BLUE, "2 heads")):
         rows = [r for r in dd[arm] if r["dose"] >= 0]
@@ -252,8 +227,6 @@ def row_mechanism(cv, loc_path, copy_path, pd_path, dose4_path, y0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results", nargs="+", required=True)
-    ap.add_argument("--localize", required=True)
-    ap.add_argument("--copying", required=True)
     ap.add_argument("--pd4l", required=True)
     ap.add_argument("--text4l", help="fourlayer/hidden_span.py output: the same three conditions in text, 4-layer model")
     ap.add_argument("--dose4l", required=True)
@@ -262,7 +235,7 @@ def main():
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1], a.text4l)
-    row_mechanism(cv, a.localize, a.copying, a.pd4l, a.dose4l, 0)
+    row_mechanism(cv, a.pd4l, a.dose4l, 0)
     cv.S.plot([0.3, W - 0.3], [ROWS[1], ROWS[1]], color="#e3e5e8", lw=2)
     fig.savefig(a.out, dpi=110)
 
