@@ -81,8 +81,9 @@ def strip(ax, paths, arm, lim, ticks, pvals):
         ax.plot([k + 0.03, k + 0.31], [own.mean()] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
         if pvals:
             pv = animal_level(L, c, np.random.default_rng(0), 20000, two_sided=True)[1]
+            col = SLATE if pv >= 0.05 else (BLUE if own.mean() > 0 else CORAL)
             ax.text(k, lim[1] * 0.97, f"p={pv:.1g}" if pv >= 1e-3 else "p<0.001", ha="center", va="top",
-                    fontsize=21, color=INK if pv < 0.05 else SLATE, weight="bold" if pv < 0.05 else "normal")
+                    fontsize=21, color=col, weight="bold" if pv < 0.05 else "normal")
     ax.axhline(0, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=1)
     ax.set_xlim(-0.55, len(paths) - 0.45)
     ax.set_ylim(*lim)
@@ -168,8 +169,8 @@ def row_mechanism(cv, loc_path, copy_path, pd_path, dose4_path, y0):
              if k.startswith("layer ") and "kv-head" in k}
     marked = sorted(heads, key=lambda k: -abs(heads[k]["raise"]))[:3]
     cv.letter(0.1, top - 0.7, "c")
-    cv.S.text(0.9, top - 0.7, f"{loc['model'].split('/')[-1]}: weights predict the sign", fontsize=28, weight="bold",
-              va="center")
+    cv.S.text(0.9, top - 0.7, f"{loc['model'].split('/')[-1]}, each attention head:\ncopying score from its weights vs. its effect",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(2.2, y0 + 1.9, 6.6, 7.4)
     xs = np.array([cp[f"{l}:{h}"]["embedding"] for l, h in heads])
     ys = np.array([v["raise"] for v in heads.values()])
@@ -192,7 +193,8 @@ def row_mechanism(cv, loc_path, copy_path, pd_path, dose4_path, y0):
              "h.3.attn.k_proj", "h.3.attn.v_proj", "h.3.attn.q_proj", "h.3.attn.o_proj"]
     names = {"k_proj": "key", "v_proj": "value", "q_proj": "query", "o_proj": "output"}
     cv.letter(10.2, top - 0.7, "d")
-    cv.S.text(11.0, top - 0.7, "4-layer model: delete one subcomponent", fontsize=28, weight="bold", va="center")
+    cv.S.text(11.0, top - 0.7, "Goodfire's 4-layer Pile model, VPD decomposition:\ndelete one subcomponent from the weights",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
     ax = cv.axes(11.9, y0 + 1.9, 8.2, 7.4)
     rng = np.random.default_rng(0)
     for k, site in enumerate(order):
@@ -219,7 +221,8 @@ def row_mechanism(cv, loc_path, copy_path, pd_path, dose4_path, y0):
 
     # e: amplify the carried state (4-layer model)
     cv.letter(21.0, top - 0.7, "e")
-    cv.S.text(21.8, top - 0.7, "amplify it", fontsize=28, weight="bold", va="center")
+    cv.S.text(21.8, top - 0.7, "same model:\namplify the carried state", fontsize=25, weight="bold", va="center",
+              linespacing=1.15)
     ax = cv.axes(22.6, y0 + 1.9, 4.9, 7.4)
     dd = json.load(open(dose4_path))
     for arm, col, lab in (("state", INK, "all"), ("readers", BLUE, "2 heads")):
