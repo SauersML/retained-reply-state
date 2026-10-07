@@ -3,7 +3,7 @@
 \usepackage{amsmath,amssymb,booktabs,graphicx,hyperref,xcolor}
 \usepackage[numbers]{natbib}
 \newcommand{\pending}[1]{\textcolor{red}{[#1]}}
-\title{Deleted thinking leaves a trace in the reply's cache,\\ and a few attention heads read it}
+\title{Introspection about deleted thinking runs through the reply's cache,\\ and a few attention heads decide its sign}
 \author{SauersML}
 \date{}
 \begin{document}
@@ -23,8 +23,9 @@ heads attend to the reply more strongly, which reverses the net sign. In Goodfir
 parameter decomposition (VPD) splits every weight matrix into rank-one subcomponents, the same route (a word copied
 into later tokens and read from their cache by a cue that cannot see the word) runs through a few subcomponents: scaling
 one query subcomponent of the reader changes the effect six-fold, and scaling the part of the later tokens' cache that
-depends on the word makes the model name it 64\% of the time. What reaches the later turn is information left in cached
-activations, not introspection.
+depends on the word makes the model name it 64\% of the time. The recall answer is thus grounded in the model's own
+internal states, the only route by which the hidden choice can reach it, but it is weak and not reliably accurate: its
+direction depends on a balance between heads that pass the choice through and heads that counteract it.
 \end{abstract}
 
 \begin{figure}[t]
