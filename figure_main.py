@@ -142,17 +142,17 @@ def row_experiment(cv, paths, y0, text4l=None):
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
     arrows = {"stripped": (0.01, 0.24, BLUE, "toward"), "visible": (-1, -19, CORAL, "away")}
     specs4 = {"stripped": ((-0.25, 0.25), [-0.2, 0, 0.2], False),
-              "retained": ((-0.4, 0.75), [0, 0.4], True),
-              "visible": ((-4, 9), [0, 4, 8], False)}
+              "retained": ((-0.4, 1.2), [0, 0.4, 0.8], True),
+              "visible": ((-4, 12), [0, 4, 8], False)}
     for (name, _), y in zip(rows, ys):
         if text4l:
-            ax4 = cv.axes(25.6, y - 0.55, 1.9, h + 1.1)
+            ax4 = cv.axes(24.4, y - 0.55, 3.2, h + 1.1)
             lim4, ticks4, pv4 = specs4[name]
-            strip(ax4, [text4l], name, lim4, ticks4, pv4)
-            ax4.set_xlim(-0.5, 0.5)
+            strip(ax4, text4l, name, lim4, ticks4, pv4)
             if name == "visible":
-                ax4.set_xticks([0], ["Goodfire\n4-layer"])
-        ax = cv.axes(16.2, y - 0.55, 8.4, h + 1.1)
+                ax4.set_xticks(range(len(text4l)), ["unedited", "key #224\n×8"][:len(text4l)], fontsize=20)
+                ax4.set_xlabel("Goodfire 4-layer", fontsize=23, labelpad=6)
+        ax = cv.axes(16.2, y - 0.55, 7.4, h + 1.1)
         lim, ticks, pv = specs[name]
         strip(ax, paths, name, lim, ticks, pv)
         if name not in arrows:
@@ -243,7 +243,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results", nargs="+", required=True)
     ap.add_argument("--pd4l", required=True)
-    ap.add_argument("--text4l", help="fourlayer/hidden_span.py output: the same three conditions in text, 4-layer model")
+    ap.add_argument("--text4l", nargs="*", default=[],
+                    help="fourlayer/hidden_span.py outputs: the same three conditions in text, 4-layer model (unedited, edited)")
     ap.add_argument("--dosesub", required=True, help="fourlayer/dose_sub.py output")
     ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
