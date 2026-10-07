@@ -18,11 +18,6 @@
     "spec": "21:6*0"
    },
    {
-    "label": "the model picks the animal itself",
-    "path": "results/q17A/q17A_free_flip.json",
-    "spec": "21:6*0"
-   },
-   {
     "label": "turn 1 without “Do not reveal it.”",
     "path": "results/q17A/q17A_noreveal.json",
     "spec": "21:6*0"
