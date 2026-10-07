@@ -152,15 +152,14 @@ def row_experiment(cv, paths, y0, text4l=None):
             strip(ax4, [text4l], name, lim4, ticks4, pv4)
             ax4.set_xlim(-0.5, 0.5)
             if name == "visible":
-                ax4.set_xticks([0], ["4-layer\n(text)"], fontsize=21)
+                ax4.set_xticks([0], ["Goodfire\n4-layer"])
         ax = cv.axes(16.2, y - 0.55, 8.4, h + 1.1)
         lim, ticks, pv = specs[name]
         strip(ax, paths, name, lim, ticks, pv)
         if name not in arrows:
             ax.set_ylabel("nats", fontsize=22)
         if name == "visible":
-            ax.set_xticks(range(len(paths)), [json.load(open(p))["model"].split("-")[-1] for p in paths])
-            ax.set_xlabel("Qwen3", fontsize=23, labelpad=6)
+            ax.set_xticks(range(len(paths)), ["Qwen3\n" + json.load(open(p))["model"].split("-")[-1] for p in paths])
         if name == "stripped":
             ax.text(len(paths) / 2 - 0.5, 0.12, "identical in every run, so exactly 0", ha="center", fontsize=20, color=SLATE)
         if name in arrows:
