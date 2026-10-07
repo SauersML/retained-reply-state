@@ -245,7 +245,7 @@ def main():
     ap.add_argument("--pd4l", required=True)
     ap.add_argument("--text4l", help="fourlayer/hidden_span.py output: the same three conditions in text, 4-layer model")
     ap.add_argument("--dosesub", required=True, help="fourlayer/dose_sub.py output")
-    ap.add_argument("--out", default="paper/figs/main.png")
+    ap.add_argument("--out", default="figs/main.png")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
