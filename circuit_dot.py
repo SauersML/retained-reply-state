@@ -3,22 +3,42 @@
 gates_dot: the recall circuit as parts and wires: the two attention steps (head 2.3 copies the word into the later
   tokens; heads 3.4 and 3.5 read them where the word is recalled) and the VPD subcomponents measured to switch them on or off
   (fourlayer/attention_gates.py, fourlayer/subcomponent_circuit.py).
-render(dot, path): dot -> PNG at the given resolution; returns the image array.
+render(dot, path, snap): dot -> PNG; label nodes moved up under their wires after layout.
 """
+import json
 import subprocess
 
 import matplotlib.image as mpimg
 
 BLUE, CORAL, INK, SLATE, CLOUD, PALE_BLUE, PALE_SLATE = "#2f6db5", "#e8684a", "#1d1d1f", "#8e959c", "#b9bfc6", "#dce8f6", "#eceef0"
 FONT = "Avenir Next"
-DOT = "/opt/homebrew/bin/dot"
+DOT, NEATO = "/opt/homebrew/bin/dot", "/opt/homebrew/bin/neato"
 
 
-def render(dot, path, dpi=220):
-    """dot -> PNG; returns the image array."""
+def render(dot, path, dpi=220, snap=()):
+    """dot -> PNG; returns the image array.  snap: (label node, tail, head) -- after layout, each label node is moved up
+    until its top sits just under the lowest wire from tail to head (dot leaves a full node gap there)."""
     with open(path + ".dot", "w") as f:
         f.write(dot)
-    subprocess.run([DOT, "-Tpng", f"-Gdpi={dpi}", "-o", path + ".png", path + ".dot"], check=True)
+    if not snap:
+        subprocess.run([DOT, "-Tpng", f"-Gdpi={dpi}", "-o", path + ".png", path + ".dot"], check=True)
+        return mpimg.imread(path + ".png")
+    laid = subprocess.run([DOT, "-Tdot", path + ".dot"], check=True, capture_output=True, text=True).stdout
+    js = json.loads(subprocess.run([DOT, "-Tjson", path + ".dot"], check=True, capture_output=True, text=True).stdout)
+    obj = {o["_gvid"]: o for o in js["objects"]}
+    by_name = {o["name"]: o for o in js["objects"]}
+    moves = []
+    for lab, a, b in snap:
+        o = by_name[lab]
+        x, y = map(float, o["pos"].split(","))
+        w, h = 72 * float(o["width"]), 72 * float(o["height"])
+        pts = [tuple(map(float, t.split(",")[-2:])) for e in js["edges"] if (obj[e["tail"]]["name"], obj[e["head"]]["name"]) == (a, b)
+               for t in e["pos"].split()]
+        under = [py for px, py in pts if x - w / 2 <= px <= x + w / 2] or [py for _, py in pts]
+        moves.append(f'  {lab} [pos="{x:.1f},{max(y, min(under) - 4 - h / 2):.1f}"];')
+    with open(path + ".dot", "w") as f:
+        f.write(laid.rstrip().rstrip("}") + "\n" + "\n".join(moves) + "\n}\n")
+    subprocess.run([NEATO, "-n2", "-Tpng", f"-Gdpi={dpi}", "-o", path + ".png", path + ".dot"], check=True)
     return mpimg.imread(path + ".png")
 
 
@@ -27,7 +47,8 @@ def width(d):
 
 
 def gates_dot(g):
-    """Parts named by layer, matrix and position; wire width grows with the recall change when the part is removed."""
+    """Parts named by layer, matrix and position; wire width grows with the recall change when the part is removed.
+    Returns the dot source and the bundles' (label node, tail, head) for render(snap=...)."""
     base = 100 * g["recall"]
     eff = {k: 100 * v["recall"] - base for k, v in g["gates"].items()}
     eff.update({k: -100 * v for k, v in g.get("screen", {}).items()})
@@ -39,9 +60,12 @@ def gates_dot(g):
     part = f'style="rounded,filled", fillcolor="white", penwidth=2.2'
     head = f'style="rounded,filled,bold", fillcolor="{PALE_BLUE}", color="{BLUE}", fontcolor="{INK}", fontsize=33, penwidth=2.6'
 
+    snap = []
+
     def bundle(a, b, label, k=10):
         """Many thin wires: information carried by many subcomponents, none of them needed alone.  The label is a node
         between the two ends, so dot sets it beside the wires and keeps other nodes clear of it."""
+        snap.append((f"{a}_{b}", a, b))
         wires = [f'  {a} -> {b} [color="{SLATE}", penwidth=0.9, arrowsize=0.55];' for _ in range(k)]
         wires.append(f'  {a}_{b} [shape=plaintext, label="{label}", fontcolor="{SLATE}", fontsize=26, margin=0];')
         wires.append(f'  {a} -> {a}_{b} -> {b} [style=invis, weight=3];')
@@ -70,7 +94,7 @@ def gates_dot(g):
   b3 -> h3 [{block(E("h.3.attn.q_proj#334@cue", "h.3.attn.q_proj#60@cue"))}];
 {bundle("h3", "answer", "many output\\nsubcomponents")}
 }}
-"""
+""", snap
 
 
 def qwen_dot():

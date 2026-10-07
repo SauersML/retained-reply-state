@@ -1,74 +1,366 @@
 digraph G {
-  rankdir=LR; splines=spline; nodesep=0.3; ranksep=0.45; bgcolor="white"; pad=0.1;
-  node [shape=box, fontname="Avenir Next", fontsize=30, margin="0.18,0.1"];
-  edge [fontname="Avenir Next", fontsize=26, fontcolor="#8e959c"];
-  { rank=same; word [label="hidden word
-“otter”", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"]; later [label="later tokens
-“. Nobody else knows.”", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"];
-    cue [label="where the word is recalled
-“My pet is a”", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"]; }
-  { rank=same; k2 [label="layer 2 keys
+	graph [bb="0,0,2208.6,932.78",
+		bgcolor=white,
+		nodesep=0.3,
+		pad=0.1,
+		rankdir=LR,
+		ranksep=0.45,
+		splines=spline
+	];
+	node [fontname="Avenir Next",
+		fontsize=30,
+		label="\N",
+		margin="0.18,0.1",
+		shape=box
+	];
+	edge [fontcolor="#8e959c",
+		fontname="Avenir Next",
+		fontsize=26
+	];
+	{
+		graph [rank=same];
+		word	[color="#eceef0",
+			fillcolor="#eceef0",
+			fontcolor="#1d1d1f",
+			height=1.3458,
+			label="hidden word
+“otter”",
+			pos="192.59,661.7",
+			style="rounded,filled",
+			width=2.7767];
+		later	[color="#eceef0",
+			fillcolor="#eceef0",
+			fontcolor="#1d1d1f",
+			height=1.3458,
+			label="later tokens
+“. Nobody else knows.”",
+			pos="192.59,382.7",
+			style="rounded,filled",
+			width=4.6517];
+		cue	[color="#eceef0",
+			fillcolor="#eceef0",
+			fontcolor="#1d1d1f",
+			height=1.3458,
+			label="where the word is recalled
+“My pet is a”",
+			pos="192.59,209.7",
+			style="rounded,filled",
+			width=5.3496];
+	}
+	{
+		graph [rank=same];
+		k2	[color="#2f6db5",
+			fillcolor=white,
+			fontcolor="#2f6db5",
+			height=1.9188,
+			label="layer 2 keys
 at the hidden word
-(2 subcomponents)", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
-    q2 [label="layer 2 query
-at the later tokens", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2]; }
-  h2 [label="layer 2, head 3
-copies the word
-into the later tokens", style="rounded,filled,bold", fillcolor="#dce8f6", color="#2f6db5", fontcolor="#1d1d1f", fontsize=33, penwidth=2.6];
-  { rank=same; k3 [label="layer 3 key
-at the later tokens", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
-    q3 [label="layer 3 query
+(2 subcomponents)",
+			penwidth=2.2,
+			pos="561.76,863.7",
+			style="rounded,filled",
+			width=4.0163];
+		q2	[color="#2f6db5",
+			fillcolor=white,
+			fontcolor="#2f6db5",
+			height=1.3458,
+			label="layer 2 query
+at the later tokens",
+			penwidth=2.2,
+			pos="561.76,386.7",
+			style="rounded,filled",
+			width=3.7454];
+	}
+	{
+		graph [rank=same];
+		k3	[color="#2f6db5",
+			fillcolor=white,
+			fontcolor="#2f6db5",
+			height=1.3458,
+			label="layer 3 key
+at the later tokens",
+			penwidth=2.2,
+			pos="900.93,410.7",
+			style="rounded,filled",
+			width=3.7454];
+		q3	[color="#2f6db5",
+			fillcolor=white,
+			fontcolor="#2f6db5",
+			height=1.9188,
+			label="layer 3 query
 where the word
-is recalled", color="#2f6db5", fontcolor="#2f6db5", style="rounded,filled", fillcolor="white", penwidth=2.2];
-    b3 [label="layer 3 queries
+is recalled",
+			penwidth=2.2,
+			pos="900.93,270.7",
+			style="rounded,filled",
+			width=3.3287];
+		b3	[color="#e8684a",
+			fillcolor=white,
+			fontcolor="#e8684a",
+			height=2.4917,
+			label="layer 3 queries
 where the word
 is recalled
-(2 subcomponents)", color="#e8684a", fontcolor="#e8684a", style="rounded,filled", fillcolor="white", penwidth=2.2]; }
-  h3 [label="layer 3, heads 4 and 5
+(2 subcomponents)",
+			penwidth=2.2,
+			pos="900.93,89.7",
+			style="rounded,filled",
+			width=4.0163];
+	}
+	word -> k2	[arrowhead=normal,
+		arrowsize=0.9,
+		color="#b9bfc6",
+		penwidth=2.2,
+		pos="e,433.48,793.68 282.47,710.6 324.59,733.77 375.88,761.99 422.9,787.86",
+		style=dashed];
+	h2	[color="#2f6db5",
+		fillcolor="#dce8f6",
+		fontcolor="#1d1d1f",
+		fontsize=33,
+		height=2.1063,
+		label="layer 2, head 3
+copies the word
+into the later tokens",
+		penwidth=2.6,
+		pos="900.93,661.7",
+		style="rounded,filled,bold",
+		width=4.5163];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.19,598.02 272.56,612.77 382.78,585.39 585.55,580.21 730.75,597.25"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,612.19 292.91,620.07 406.44,601.93 594.15,599.1 730.83,611.58"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,626.33 292.91,631.96 406.44,619.01 594.15,616.99 730.83,625.9"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,640.48 292.91,643.86 406.44,636.08 594.15,634.87 730.83,640.22"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,654.63 292.91,655.75 406.44,653.16 594.15,652.76 730.83,654.54"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,668.77 292.91,667.65 406.44,670.24 594.15,670.64 730.83,668.86"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,682.92 292.91,679.54 406.44,687.32 594.15,688.53 730.83,683.18"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,697.07 292.91,691.44 406.44,704.39 594.15,706.41 730.83,697.5"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.3,711.21 292.91,703.33 406.44,721.47 594.15,724.3 730.83,711.82"];
+	word -> h2	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,737.19,725.38 272.56,710.63 382.78,738.01 585.55,743.19 730.75,726.15"];
+	word_h2	[fontcolor="#8e959c",
+		fontsize=26,
+		height=1,
+		label="78 value\nsubcomponents",
+		margin=0,
+		pos="561.76,492.7",
+		shape=plaintext,
+		width=2.6562];
+	word -> word_h2	[pos="e,466.24,525.67 281.56,612.82 322.25,591.06 371.57,565.85 417.17,545.7 429.54,540.23 442.67,534.85 455.76,529.72",
+		style=invis,
+		weight=3];
+	later -> q2	[arrowhead=normal,
+		arrowsize=0.9,
+		color="#b9bfc6",
+		penwidth=2.2,
+		pos="e,425.86,385.23 360.52,384.52 378.21,384.71 396.11,384.91 413.55,385.1",
+		style=dashed];
+	later -> k3	[arrowhead=normal,
+		arrowsize=0.9,
+		color="#b9bfc6",
+		penwidth=2.2,
+		pos="e,765.12,363.81 347,333.79 450.7,308.52 589.48,290.06 706.34,327.7 723.01,333.07 722.88,342.47 738.34,350.7 743.44,353.41 748.68,\
+356.06 754.03,358.63",
+		style=dashed];
+	cue -> q3	[arrowhead=normal,
+		arrowsize=0.9,
+		color="#b9bfc6",
+		penwidth=2.2,
+		pos="e,780.25,260.36 385.66,226.29 506.92,236.76 660.41,250.02 768.02,259.31",
+		style=dashed];
+	cue -> b3	[arrowhead=normal,
+		arrowsize=0.9,
+		color="#b9bfc6",
+		penwidth=2.2,
+		pos="e,755.52,114.23 385.66,177.07 497.97,157.99 637.93,134.21 743.47,116.28",
+		style=dashed];
+	k2 -> h2	[arrowhead=normal,
+		arrowsize=1.1,
+		color="#2f6db5",
+		penwidth=4.81,
+		pos="e,771.33,738.76 679.91,793.54 688.85,788.18 697.74,782.85 706.34,777.7 722.67,767.92 739.77,757.67 756.77,747.49"];
+	q2 -> h2	[arrowhead=normal,
+		arrowsize=1.1,
+		color="#2f6db5",
+		penwidth=3.48,
+		pos="e,845.07,584.72 691.56,436.11 696.66,439.16 701.61,442.36 706.34,445.7 755.28,480.27 800.54,529.36 834.97,572"];
+	h3	[color="#2f6db5",
+		fillcolor="#dce8f6",
+		fontcolor="#1d1d1f",
+		fontsize=33,
+		height=2.1063,
+		label="layer 3, heads 4 and 5
 read the later tokens
-where the word is recalled", style="rounded,filled,bold", fillcolor="#dce8f6", color="#2f6db5", fontcolor="#1d1d1f", fontsize=33, penwidth=2.6];
-  answer [label="answer:
-“otter”", style="rounded,filled,bold", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f", fontsize=33];
-  word -> k2 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9]; later -> q2 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9]; later -> k3 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9]; cue -> q3 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9]; cue -> b3 [color="#b9bfc6", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word -> h2 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  word_h2 [shape=plaintext, label="78 value\nsubcomponents", fontcolor="#8e959c", fontsize=26, margin=0];
-  word -> word_h2 -> h2 [style=invis, weight=3];
-  k2 -> h2 [color="#2f6db5", penwidth=4.81, arrowhead=normal, arrowsize=1.1];
-  q2 -> h2 [color="#2f6db5", penwidth=3.48, arrowhead=normal, arrowsize=1.1];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2 -> h3 [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h2_h3 [shape=plaintext, label="the copied word:\nmany output and\nvalue subcomponents", fontcolor="#8e959c", fontsize=26, margin=0];
-  h2 -> h2_h3 -> h3 [style=invis, weight=3];
-  k3 -> h3 [color="#2f6db5", penwidth=5.22, arrowhead=normal, arrowsize=1.1];
-  q3 -> h3 [color="#2f6db5", penwidth=2.38, arrowhead=normal, arrowsize=1.1];
-  b3 -> h3 [color="#e8684a", penwidth=6.14, arrowhead=tee, arrowsize=1.4];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3 -> answer [color="#8e959c", penwidth=0.9, arrowsize=0.55];
-  h3_answer [shape=plaintext, label="many output\nsubcomponents", fontcolor="#8e959c", fontsize=26, margin=0];
-  h3 -> h3_answer -> answer [style=invis, weight=3];
+where the word is recalled",
+		penwidth=2.6,
+		pos="1599.8,661.7",
+		style="rounded,filled,bold",
+		width=5.8496];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,592.86 1064.4,597.78 1158.8,586.17 1278.9,584.34 1381.3,592.32"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,608.16 1064.4,611.99 1158.8,602.95 1278.9,601.53 1381.3,607.74"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,623.45 1064.4,626.19 1158.8,619.74 1278.9,618.72 1381.3,623.16"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,638.75 1064.4,640.39 1158.8,636.52 1278.9,635.91 1381.3,638.57"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,654.05 1064.4,654.6 1158.8,653.31 1278.9,653.1 1381.3,653.99"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,669.35 1064.4,668.8 1158.8,670.09 1278.9,670.3 1381.3,669.41"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,684.65 1064.4,683.01 1158.8,686.88 1278.9,687.49 1381.3,684.83"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,699.95 1064.4,697.21 1158.8,703.66 1278.9,704.68 1381.3,700.24"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,715.24 1064.4,711.41 1158.8,720.45 1278.9,721.87 1381.3,715.66"];
+	h2 -> h3	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,1388,730.54 1064.4,725.62 1158.8,737.23 1278.9,739.06 1381.3,731.08"];
+	h2_h3	[fontcolor="#8e959c",
+		fontsize=26,
+		height=1.5,
+		label="the copied word:\nmany output and\nvalue subcomponents",
+		margin=0,
+		pos="1226.4,474.7",
+		shape=plaintext,
+		width=3.6354];
+	h2 -> h2_h3	[pos="e,1125.9,528.57 1028.8,584.7 1051,571.54 1073.8,558.11 1095.5,545.7 1102.3,541.84 1109.2,537.9 1116.3,533.95",
+		style=invis,
+		weight=3];
+	k3 -> h3	[arrowhead=normal,
+		arrowsize=1.1,
+		color="#2f6db5",
+		penwidth=5.22,
+		pos="e,1550.8,584.7 1036.7,383.28 1130.4,370.59 1256.1,366.54 1357.3,409.7 1434,442.45 1498.1,512.89 1540.9,570.99"];
+	q3 -> h3	[arrowhead=normal,
+		arrowsize=1.1,
+		color="#2f6db5",
+		penwidth=2.38,
+		pos="e,1555.6,584.67 1021.6,275.41 1118.3,284 1254.8,307.34 1357.3,369.7 1438.7,419.3 1505.4,506.37 1547.9,572.56"];
+	b3 -> h3	[arrowhead=tee,
+		arrowsize=1.4,
+		color="#e8684a",
+		penwidth=6.14,
+		pos="e,1567.3,584.79 1046.4,125.31 1142.6,154.55 1267.3,203.73 1357.3,279.7 1453.8,361.22 1524.5,491.36 1563.7,576.68"];
+	answer	[color="#eceef0",
+		fillcolor="#eceef0",
+		fontcolor="#1d1d1f",
+		fontsize=33,
+		height=1.4708,
+		label="answer:
+“otter”",
+		pos="2137.1,661.7",
+		style="rounded,filled,bold",
+		width=1.985];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,609.39 1811.6,588.96 1898.6,584.28 1994,590.49 2058.7,607.59"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,621.02 1811.6,605.12 1898.6,601.48 1994,606.31 2058.7,619.62"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,632.64 1811.6,621.29 1898.6,618.69 1994,622.14 2058.7,631.64"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,644.26 1811.6,637.45 1898.6,635.89 1994,637.96 2058.7,643.66"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,655.89 1811.6,653.62 1898.6,653.1 1994,653.79 2058.7,655.69"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,667.51 1811.6,669.78 1898.6,670.3 1994,669.61 2058.7,667.71"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,679.14 1811.6,685.95 1898.6,687.51 1994,685.44 2058.7,679.74"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,690.76 1811.6,702.11 1898.6,704.71 1994,701.26 2058.7,691.76"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,702.38 1811.6,718.28 1898.6,721.92 1994,717.09 2058.7,703.78"];
+	h3 -> answer	[arrowsize=0.55,
+		color="#8e959c",
+		penwidth=0.9,
+		pos="e,2065.2,714.01 1811.6,734.44 1898.6,739.12 1994,732.91 2058.7,715.81"];
+	h3_answer	[fontcolor="#8e959c",
+		fontsize=26,
+		height=1,
+		label="many output\nsubcomponents",
+		margin=0,
+		pos="1938.1,492.7",
+		shape=plaintext,
+		width=2.6562];
+	h3 -> h3_answer	[pos="e,1865.8,528.5 1754.2,584.62 1789.2,567.02 1825.1,548.99 1855.7,533.61",
+		style=invis,
+		weight=3];
+	word_h2 -> h2	[pos="e,779.2,584.68 657.26,524.72 673.84,531.15 690.76,538.24 706.34,545.7 727.16,555.67 748.65,567.2 769.4,579.04",
+		style=invis,
+		weight=3];
+	h2_h3 -> h3	[pos="e,1445.7,584.6 1334.3,528.54 1365.9,544.45 1401.3,562.24 1435.6,579.5",
+		style=invis,
+		weight=3];
+	h3_answer -> answer	[pos="e,2095.6,608.49 2009.5,528.63 2018,533.94 2026.2,539.67 2033.7,545.7 2053.2,561.43 2072.1,581.09 2088.2,599.73",
+		style=invis,
+		weight=3];
+
+  word_h2 [pos="561.8,540.2"];
+  h2_h3 [pos="1226.4,526.3"];
+  h3_answer [pos="1938.1,544.3"];
 }

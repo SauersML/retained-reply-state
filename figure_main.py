@@ -445,7 +445,7 @@ def row_circuit(cv, parts, y0):
     cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: the recall circuit, two attention steps switched on and off by a few VPD subcomponents",
               fontsize=25, weight="bold", va="center")
     key(cv, 1.2, top - 1.75)
-    image(cv, circuit_dot.render(circuit_dot.gates_dot(g), "figs/circuit_gates"), 0.6, top - 2.6, 26.8, 9.6, middle=True)
+    image(cv, circuit_dot.render(*circuit_dot.gates_dot(g)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g)[1]), 0.6, top - 2.6, 26.8, 9.6, middle=True)
 
 
 def key(cv, x, y):
