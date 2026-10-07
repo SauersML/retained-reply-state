@@ -17,6 +17,7 @@ Also saved: the residual stream at the reply's last text token for every layer (
 """
 import argparse
 import json
+import re
 import time
 
 import numpy as np
@@ -47,6 +48,16 @@ RECALL_B = ("In the preceding turn of this conversation, during your internal th
 WORDINGS = {"A": (TURN1, RECALL), "B": (TURN1_B, RECALL_B)}
 
 
+def last_named(text):
+    """The animal of the list whose name ends last in the text (whole words, any case), or None."""
+    low, best, end = text.lower(), None, -1
+    for c in ANIMALS:
+        for m in re.finditer(r"\b" + c + r"s?\b", low):
+            if m.end() > end:
+                best, end = c, m.end()
+    return best
+
+
 def prompts(result):
     """The first-turn and recall prompts a hidden_choice.py result was made with."""
     return WORDINGS[result.get("wording", "A")]
@@ -66,6 +77,9 @@ def main():
     ap.add_argument("--batch", type=int, default=24)
     ap.add_argument("--max-new", type=int, default=600)
     ap.add_argument("--arms", default="stripped,visible,retained,neutral")
+    ap.add_argument("--choice", default="forced", choices=["forced", "free"],
+                    help="forced: the animal is drawn uniformly and written into the thinking; free: the model chooses, "
+                         "and the chosen animal is the last of the 50 names its thinking mentions")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--wording", default="A", choices=sorted(WORDINGS))
@@ -98,7 +112,7 @@ def main():
         for s0 in range(0, a.n, a.batch):
             B = min(a.batch, a.n - s0)
             chosen = [ANIMALS[k] for k in rng.integers(0, len(ANIMALS), B)]
-            starts = [f"<think>\n{OPEN[rng.integers(len(OPEN))]} Draw #{rng.integers(100, 1000)}: {c}. "
+            starts = ["<think>\n"] * B if a.choice == "free" else [f"<think>\n{OPEN[rng.integers(len(OPEN))]} Draw #{rng.integers(100, 1000)}: {c}. "
                       f"{CLOSE[rng.integers(len(CLOSE))]} I'll keep {c} in mind." for c in chosen]
             seqs = [prompt + tok.encode(s, add_special_tokens=False) for s in starts]
             W = max(map(len, seqs))
@@ -113,7 +127,13 @@ def main():
                     continue
                 thinking, visible = text.split("</think>", 1)
                 if visible.strip() == "I understand.":
-                    runs.append({"animal": chosen[j], "thinking": thinking.replace("<think>", "", 1).strip()})
+                    thinking = thinking.replace("<think>", "", 1).strip()
+                    if a.choice == "free":
+                        named = last_named(thinking)
+                        if named is None:
+                            continue
+                        chosen[j] = named
+                    runs.append({"animal": chosen[j], "thinking": thinking})
             del out
             print(f"turn 1: {s0 + B} generated, {len(runs)} kept, {time.time() - t0:.0f}s", flush=True)
 
@@ -130,7 +150,7 @@ def main():
             states.append(torch.stack([h[0, -2].float().cpu() for h in o.hidden_states]).numpy())
         np.save(a.out.replace(".json", "_states.npy"), np.stack(states).astype(np.float16))
 
-        result = {"model": a.model, "wording": a.wording, "animals": ANIMALS, "chosen": [r["animal"] for r in runs],
+        result = {"model": a.model, "wording": a.wording, "choice": a.choice, "animals": ANIMALS, "chosen": [r["animal"] for r in runs],
                   "thinking": [r["thinking"] for r in runs], "arms": {}}
         for arm in a.arms.split(","):
             L = np.zeros((len(runs), len(ANIMALS)))
