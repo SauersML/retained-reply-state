@@ -44,11 +44,11 @@ def gates_dot(g):
 
     def bundle(a, b, label, k=10):
         """Many thin wires: information carried by many subcomponents, none of them needed alone."""
-        wires = [f'  {a} -> {b} [color="{CLOUD}", penwidth=0.9, arrowhead=none];' for _ in range(k - 1)]
-        wires.append(f'  {a} -> {b} [color="{CLOUD}", penwidth=0.9, arrowsize=0.8, label="{label}", fontcolor="{SLATE}"];')
+        wires = [f'  {a} -> {b} [color="{SLATE}", penwidth=0.9, arrowsize=0.55];' for _ in range(k - 1)]
+        wires.append(f'  {a} -> {b} [color="{SLATE}", penwidth=0.9, arrowsize=0.55, xlabel="{label}", fontcolor="{SLATE}"];')
         return "\n".join(wires)
     return f"""digraph G {{
-  rankdir=LR; splines=spline; nodesep=0.3; ranksep=0.45; bgcolor="white"; pad=0.1;
+  rankdir=LR; splines=spline; nodesep=0.3; ranksep=0.45; bgcolor="white"; pad=0.1; forcelabels=true;
   node [shape=box, fontname="{FONT}", fontsize=30, margin="0.18,0.1"];
   edge [fontname="{FONT}", fontsize=26, fontcolor="{SLATE}"];
   {{ rank=same; word [label="hidden word\n“otter”", {token}]; later [label="later tokens\n“. Nobody else knows.”", {token}];
