@@ -280,7 +280,7 @@ def row_head(cv, y0, flip_groups, questions, attention):
     panel_switch(cv, 5.4, y0 + 1.1, 5.6, 6.9, flip_groups)
 
     cv.letter(12.2, top - 0.75, "d")
-    cv.S.text(13.0, top - 0.75, "the wording of the turn-2 question sets the\ndirection, and only while head 21.6 works",
+    cv.S.text(13.0, top - 0.75, "the two recall questions give opposite results\nwith head 21.6, and the same result without it",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     cv.S.add_patch(plt.Rectangle((13.15, top - 2.55), 0.4, 0.4, facecolor="white", edgecolor=SLATE, lw=2.5))
     cv.S.text(13.75, top - 2.35, "original model", fontsize=20, color=SLATE, va="center")
@@ -289,7 +289,7 @@ def row_head(cv, y0, flip_groups, questions, attention):
     panel_questions(cv, 14.6, y0 + 2.6, 6.2, 6.3, questions)
 
     cv.letter(21.3, top - 0.75, "e")
-    cv.S.text(22.1, top - 0.75, "why: “Which animal did you\nchoose?” makes head 21.6\nlook at the reply more",
+    cv.S.text(22.1, top - 0.75, "why: asked “Which animal did\nyou choose?”, head 21.6\nattends more to the reply",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     att = [json.load(open(p)) for p in attention]
     ax = cv.axes(23.0, y0 + 2.6, 4.6, 6.3)
@@ -307,22 +307,26 @@ def row_head(cv, y0, flip_groups, questions, attention):
 
 
 def panel_words(cv, x, y, w, h, path):
-    """Discrimination for turn-2 questions that differ only in their final request, over the same turn-1 caches
+    """Discrimination for turn-2 questions that differ only in their wording, over the same turn-1 caches
     (edit_heads.py --question); bars start at chance."""
     e = json.load(open(path))["edits"]["none"]
-    rows = [("retained", "\u201cWhich animal did you choose?\u201d"),
+    rows = [(None, "opening A: \u201cIn the previous turn you chose one\nanimal from the list in your thinking. \u2026\u201d, then"),
+            ("retained", "\u201cWhich animal did you choose?\u201d"),
             ("A_recall", "\u201cRecall which animal you chose\u201d"),
             ("A_introspect", "\u201cIntrospect on which animal you chose\u201d"),
             ("A_reconstruct", "\u201cReconstruct which animal you chose\u201d"),
-            ("A_all_three", "\u201cRecall, introspect, or reconstruct which\nanimal you chose\u201d"),
-            (None, None),
-            ("B_original", "question B as written"),
-            ("B_which", "question B ending \u201cWhich animal did\nyou choose?\u201d")]
+            ("A_all_three", "\u201cRecall, introspect, or reconstruct \u2026\u201d"),
+            (None, "opening B: \u201cIn the preceding turn of this conversation,\nduring your internal thinking, you chose \u2026\u201d, then"),
+            ("B_original", "\u201cRecall, introspect, or reconstruct \u2026\u201d"),
+            ("B_which", "\u201cWhich animal did you choose?\u201d")]
     ax = cv.axes(x, y, w, h)
     yy, ticks, labels = 0.0, [], []
     for arm, label in rows:
         if arm is None:
-            yy -= 0.5
+            yy -= 0.4 if ticks else 0
+            ax.text(-0.02, yy - 0.2, label, transform=ax.get_yaxis_transform(), fontsize=18, color=INK, weight="bold",
+                    va="center", ha="right", linespacing=1.05)
+            yy -= 1.4
             continue
         if arm not in e:
             continue
@@ -333,12 +337,12 @@ def panel_words(cv, x, y, w, h, path):
         ticks.append(yy)
         labels.append(label)
         yy -= 1.0
-    direction_axis(ax, 35, 70)
+    direction_axis(ax, 35, 65)
     ax.set_yticks(ticks, labels, fontsize=19)
     ax.tick_params(axis="y", length=0)
     ax.spines["left"].set_visible(False)
     ax.set_ylim(yy + 0.4, 0.6)
-    ax.set_xticks([40, 50, 60, 70])
+    ax.set_xticks([40, 50, 60])
     ax.set_xlabel("hidden animal ranked above another animal (%)", fontsize=22)
 
 
@@ -381,9 +385,9 @@ def row_fourlayer(cv, sweep_paths, optimized, words, y0):
     ax.set_ylabel("hidden word ranked above\nanother word (%)")
     if words:
         cv.letter(13.6, top - 0.75, "g")
-        cv.S.text(14.4, top - 0.75, "Qwen3-1.7B: which words in the recall question turn the\nanswer toward the hidden animal (same caches, original model)",
+        cv.S.text(14.4, top - 0.75, "Qwen3-1.7B, original model: the result for each wording\nof the recall question, asked over the same caches",
                   fontsize=25, weight="bold", va="center", linespacing=1.15)
-        panel_words(cv, 20.6, y0 + 1.6, 6.6, 6.9, words)
+        panel_words(cv, 21.0, y0 + 1.6, 6.4, 7.0, words)
 
 
 def main():
