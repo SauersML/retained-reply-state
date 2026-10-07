@@ -184,19 +184,15 @@ def row_mechanism(cv, pd_path, dosesub_path, y0):
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     # the route: the word reaches the cue only through the tokens after it
     yb, hb = top - 3.15, 0.8
-    cv.block(2.6, yb, 1.7, hb, PALE_CORAL, CORAL, "otter", fs=22)
+    cv.block(2.6, yb, 1.7, hb, "white", "#e3a1a8", "otter", fs=22, color="#d98b93", style=(0, (4, 3)))
+    cv.S.text(3.45, yb + hb + 0.25, "not kept", ha="center", fontsize=20, color=RED, weight="bold")
     cv.block(6.2, yb, 4.3, hb, PALE_BLUE, BLUE, ". Nobody else knows.", fs=22)
+    cv.S.text(8.35, yb + hb + 0.25, "cache kept", ha="center", fontsize=20, color=BLUE, weight="bold")
     cv.block(12.4, yb, 3.2, hb, PALE_SLATE, "none", "My pet is a", fs=22)
     for x_from, x_to, lab in ((4.35, 6.15, "layer 2"), (10.55, 12.35, "layer 3")):
         cv.S.annotate("", xy=(x_to, yb + hb / 2), xytext=(x_from, yb + hb / 2),
                       arrowprops=dict(arrowstyle="-|>", color=INK, lw=2.5, mutation_scale=24))
         cv.S.text((x_from + x_to) / 2, yb - 0.32, lab, ha="center", fontsize=20, weight="bold")
-    cv.S.annotate("", xy=(14.0, yb + hb + 0.05), xytext=(3.45, yb + hb + 0.05),
-                  arrowprops=dict(arrowstyle="-|>", color="#e3a1a8", lw=2.5, ls=(0, (4, 3)), mutation_scale=24,
-                                  connectionstyle="arc3,rad=-0.08"))
-    cx, cy, r = 8.7, yb + hb + 0.47, 0.2
-    cv.S.plot([cx - r, cx + r], [cy - r, cy + r], color=RED, lw=4, solid_capstyle="round")
-    cv.S.plot([cx - r, cx + r], [cy + r, cy - r], color=RED, lw=4, solid_capstyle="round")
     ax = cv.axes(2.2, y0 + 1.9, 13.6, 7.0)
     rng = np.random.default_rng(0)
     for k, site in enumerate(order):
