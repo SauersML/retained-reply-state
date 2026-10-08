@@ -116,13 +116,15 @@ ATT_SOURCES = {"A": (HELD, "retained"), "B": (HELD, "recall_B"), "neutral": (HEL
                "cpu_neutral": (HELD, "cpu_neutral")}
 
 
-def wording(out="figs/wording.png", word="results/fp32/wording_heldout_mac.npz", att="results/fp32/attention_all.npz"):
-    """Left: recall for each wording, head 21.6 working and switched off (held-out runs; p: paired against the plain
-    question).  Right: per question, head 21.6's attention from the answer position to the reply against recall."""
+def wording(out="figs/wording.png", word="results/fp32/wording_heldout_mac.npz+results/fp32/wording_discovery.npz",
+            att="results/fp32/attention_all.npz", att_word="results/fp32/wording_heldout_mac.npz"):
+    """Left: recall for each wording, head 21.6 working and switched off (both run sets, 1,197 runs; p: paired against the
+    plain question).  Right: per question, head 21.6's attention from the answer position to the reply against recall."""
     rng = np.random.default_rng(0)
     fig = plt.figure(figsize=(22, 9.6))
     ax = fig.add_axes([0.25, 0.14, 0.33, 0.68])
     base = {e: saved_logp(word, f"{e}|preA_askA") for e in ("none", "21:6*0")}
+    shift = {"none": [], "21:6*0": []}
     for i, (k, lab) in enumerate(WORDING):
         y = len(WORDING) - 1 - i
         for e, col in (("21:6*0", SLATE), ("none", BLUE)):
@@ -130,20 +132,21 @@ def wording(out="figs/wording.png", word="results/fp32/wording_heldout_mac.npz",
             mu, lo, hi = mean_ci(L, c, rng)
             ax.plot([lo, hi], [y, y], color=col, lw=2.2)
             ax.scatter([mu], [y], s=150, color=col, edgecolor="white", lw=1.4, zorder=3)
-            if e == "none" and k != "preA_askA":
+            if k != "preA_askA":
+                shift[e].append(mu - per_animal(base[e][0], c).mean())
                 pv = p_paired(centred_logp(L, c) - centred_logp(base[e][0], c), rng)
-                ax.text(hi + 0.6, y, p_text(pv), fontsize=15, va="center", color=BLUE if pv < 0.05 else CLOUD)
+                ax.text(hi + 0.6, y, p_text(pv), fontsize=14, va="center", color=col if pv < 0.05 else CLOUD)
     ax.set_yticks(range(len(WORDING)), [lab for _, lab in WORDING][::-1], fontsize=16)
     ax.axvline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)))
-    ax.set_xlim(35, 80)
+    ax.set_xlim(35, 84)
     ax.set_xlabel("hidden animal ranked above another animal (%)", fontsize=19)
     ax.tick_params(axis="y", length=0)
     ax.spines["left"].set_visible(False)
     ax.text(36, len(WORDING) - 0.35, "head 21.6 working", color=BLUE, fontsize=18)
     ax.text(64, len(WORDING) - 0.35, "switched off", color=SLATE, fontsize=18)
     fig.text(0.01, 0.93, "a", fontsize=36, weight="bold")
-    fig.text(0.03, 0.93, "every edit of the plain question raises recall; none\nmatters with head 21.6 switched off",
-             fontsize=21, weight="bold", va="center")
+    fig.text(0.03, 0.93, f"every edit of the plain question raises recall by {min(shift['none']):.0f}-{max(shift['none']):.0f} points;\n"
+             f"with head 21.6 switched off, by at most {max(np.abs(shift['21:6*0'])):.0f}", fontsize=21, weight="bold", va="center")
 
     ax = fig.add_axes([0.68, 0.14, 0.3, 0.68])
     z = np.load(att)
@@ -151,7 +154,7 @@ def wording(out="figs/wording.png", word="results/fp32/wording_heldout_mac.npz",
     pts = []
     labels = {"A": "\u201cWhich animal\u2026?\u201d", "B": "introspective\nquestion", "neutral": "\u201cName one\nanimal\u2026\u201d",
               "doc_A": "Janus's explainer\n+ \u201cWhich animal\u2026?\u201d", "cpu_A": "CPU explainer\n+ \u201cWhich animal\u2026?\u201d"}
-    for k, (src, arm) in list(ATT_SOURCES.items()) + [(k, (word, f"{k}")) for k, _ in WORDING if k not in ("preA_askA", "preB_askB")]:
+    for k, (src, arm) in list(ATT_SOURCES.items()) + [(k, (att_word, f"{k}")) for k, _ in WORDING if k not in ("preA_askA", "preB_askB")]:
         L, c = saved_logp(src, f"none|{arm}")
         a = 100 * z[k][:, 0, 6 * g:7 * g].mean()
         r = per_animal(L, c).mean()
@@ -178,7 +181,7 @@ def wording(out="figs/wording.png", word="results/fp32/wording_heldout_mac.npz",
     fig.text(0.62, 0.93, "b", fontsize=36, weight="bold")
     fig.text(0.64, 0.93, f"the less head 21.6 reads the reply, the higher\nrecall (15 questions, correlation {rho:.2f})",
              fontsize=21, weight="bold", va="center")
-    fig.text(0.03, 0.995, "Qwen3-1.7B, held-out runs", fontsize=16, color=SLATE, va="top")
+    fig.text(0.03, 0.995, "Qwen3-1.7B (a: both run sets; b: held-out runs)", fontsize=16, color=SLATE, va="top")
     fig.savefig(out, dpi=110, facecolor="white")
 
 
