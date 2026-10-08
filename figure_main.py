@@ -1,4 +1,4 @@
-"""The main figure (make_figure.sh), four rows.
+"""The main figure (make_figure.sh), five rows.
   a-b  the experiment, and per model the share of other animals the hidden animal is ranked above at recall (each
        animal relative to its mean over runs; 50% = chance) in each condition; last column: the same three conditions in
        text on Goodfire's 4-layer model, as the raise of the hidden word's log P within its template (nats)
@@ -7,8 +7,9 @@
        wording (Qwen3-1.7B, Qwen3-0.6B, and Qwen3-1.7B with head 21.6 switched off)
   f-h  each question alone and after Janus's LLM explainer (Qwen3-1.7B and 0.6B); the same with a CPU explainer of the
        same length and style between the two; the Qwen3-1.7B head circuit
-  i-j  Goodfire's 4-layer model: the fewest VPD subcomponents that make the hidden word the top answer; the attention
-       route of recall and the subcomponents that switch it (Graphviz, circuit_dot.py)
+  i-j  Goodfire's 4-layer model: the fewest VPD subcomponents that make the hidden word the top answer; the test's three
+       conditions in plain text
+  k    the 4-layer model's attention route of recall and the subcomponents that switch it (Graphviz, circuit_dot.py)
 Paired p-values: sign flips (t statistic) of each run's paired difference in the hidden animal's log P relative to
 that animal's mean over runs; p against chance: re-pairing hidden animals.
 usage: make_figure.sh
@@ -37,7 +38,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [14.5, 11.5, 11.5, 12.5]            # heights of the four rows
+ROWS = [14.5, 11.5, 11.5, 11.5, 12.0]      # heights of the five rows
 H = sum(ROWS)
 
 
@@ -526,6 +527,7 @@ def row_controls(cv, y0, npz, other):
 
 def row_fourlayer(cv, refits, parts, y0):
     """Panels i-j, occupying [y0, y0 + ROWS[3]].
+    j: the three conditions of the 4-layer test in plain text (text_schematic).
     i: Goodfire's 4-layer model, the fewest VPD subcomponents that make the hidden word the top answer: for each K, the
        scales of only the K largest subcomponents of a fitted edit fitted again on the training templates; on held-out
        templates, how often the hidden word is the model's first choice among the 50 words, against K, colored by KL on
@@ -562,17 +564,64 @@ def row_fourlayer(cv, refits, parts, y0):
     ax.set_xlabel("subcomponents rescaled\n(of 9,728 searched)")
     ax.set_ylabel("hidden word is the top answer\namong 50 words (%),\nheld-out sentences")
 
+    text_schematic(cv, 10.6, top)
+
+
+def text_schematic(cv, x0, top):
+    """Panel j: the three conditions of Goodfire's 4-layer model in plain text (fourlayer/hidden_span.py): attention
+    masks, in every layer, decide which later tokens may read the hidden word; arcs from the word to its readers."""
+    S, h = cv.S, 0.95
+    cv.letter(x0 - 0.5, top - 0.75, "j")
+    S.text(x0 + 0.3, top - 0.75, "Goodfire 4-layer model: the same test in plain text", fontsize=25, weight="bold", va="center")
+    rows = [("stripped", SLATE, "no later token\nreads the word", False, False),
+            ("retained", BLUE, "only the later\ntokens read it", True, False),
+            ("visible", CORAL, "every later\ntoken reads it", True, True)]
+    xs = {"frame": (x0 + 3.7, 2.3), "word": (x0 + 6.15, 1.1), "later": (x0 + 7.4, 3.9), "cue": (x0 + 11.45, 2.3)}
+
+    def arc(xa, xb, y, ok, rad):
+        col = BLUE if ok else CORAL
+        S.annotate("", xy=(xb, y), xytext=(xa, y), arrowprops=dict(arrowstyle="-|>" if ok else "-", color=col, lw=3,
+                   mutation_scale=22, connectionstyle=f"arc3,rad={rad}", shrinkA=2, shrinkB=2, ls="-" if ok else (0, (3, 2))))
+        if not ok:
+            S.text((xa + xb) / 2, y - rad * (xb - xa) / 2, "\u00d7", ha="center", va="center", fontsize=30, color=CORAL,
+                   weight="bold")
+    for k, (name, col, label, later_ok, cue_ok) in enumerate(rows):
+        y = top - 3.3 - 2.55 * k
+        S.text(x0 + 0.1, y + h / 2, label, fontsize=21, color=col, weight="bold", va="center", linespacing=1.05)
+        cv.block(*xs["frame"][:1], y, xs["frame"][1], h, PALE_SLATE, "none", "My pet is a", fs=19)
+        cv.block(xs["word"][0], y, xs["word"][1], h, PALE_CORAL, CORAL, "fox", fs=21)
+        cv.block(xs["later"][0], y, xs["later"][1], h, PALE_SLATE, "none", ". Nobody else knows.", fs=19)
+        cv.block(xs["cue"][0], y, xs["cue"][1], h, PALE_SLATE, "none", "My pet is a", fs=19)
+        S.annotate("", xy=(x0 + 14.75, y + h / 2), xytext=(x0 + 13.9, y + h / 2),
+                   arrowprops=dict(arrowstyle="-|>", color=INK, lw=2.5, mutation_scale=24))
+        S.text(x0 + 14.9, y + h / 2, "?", fontsize=24, va="center", color=INK, weight="bold")
+        wx = xs["word"][0] + xs["word"][1] / 2
+        arc(wx, xs["later"][0] + xs["later"][1] / 2, y + h + 0.05, later_ok, -0.45)
+        arc(wx, xs["cue"][0] + xs["cue"][1] / 2, y + h + 0.05, cue_ok, -0.3)
+    ky = top - 3.3 - 2.55 * 3 + 1.0
+    S.annotate("", xy=(x0 + 4.9, ky), xytext=(x0 + 3.7, ky), arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=3, mutation_scale=22))
+    S.text(x0 + 5.1, ky, "the token reads the word", fontsize=19, color=BLUE, va="center")
+    S.plot([x0 + 9.4, x0 + 10.6], [ky, ky], color=CORAL, lw=3, ls=(0, (3, 2)))
+    S.text(x0 + 10.0, ky, "\u00d7", ha="center", va="center", fontsize=30, color=CORAL, weight="bold")
+    S.text(x0 + 10.8, ky, "blocked by the attention mask", fontsize=19, color=CORAL, va="center")
+
+
+def row_circuit(cv, parts, y0):
+    """Panel k, occupying [y0, y0 + ROWS[4]]: the 4-layer recall circuit's attention route and the VPD subcomponents
+    measured to switch it (fourlayer/attention_gates.py), drawn by Graphviz."""
+    import circuit_dot
     if not parts or not os.path.exists(parts):
         return
+    top = y0 + ROWS[4]
     g = json.load(open(parts))
-    cv.letter(10.4, top - 0.75, "j")
+    cv.letter(0.1, top - 0.75, "k")
     stress = json.load(open(os.path.join(os.path.dirname(parts), "stress_circuit.json")))
     share = 1 - stress["routes"]["circuit blocked"]["raise"] / stress["unedited"]["raise"]    # blocking both steps
-    cv.S.text(11.2, top - 0.75, f"Goodfire 4-layer model: the attention route behind {100 * share:.0f}% of recall",
+    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: the attention route behind {100 * share:.0f}% of recall",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    key(cv, 11.4, top - 1.8)
+    key(cv, 1.2, top - 1.8)
     image(cv, circuit_dot.render(*circuit_dot.gates_dot(g)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g)[1]),
-          10.6, top - 2.75, 17.2, ROWS[3] - 3.0)
+          0.6, top - 2.75, 26.8, ROWS[4] - 3.0)
 
 
 def key(cv, x, y):
@@ -628,10 +677,11 @@ def main():
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
-    row_experiment(cv, a.results, ROWS[1] + ROWS[2] + ROWS[3], a.text4l, a.retained)
-    row_head(cv, ROWS[2] + ROWS[3], json.load(open(a.flip)), a.questions, a.questions06)
-    row_controls(cv, ROWS[3], a.questions, a.questions06)
-    row_fourlayer(cv, a.refit, a.parts, 0)
+    row_experiment(cv, a.results, sum(ROWS[1:]), a.text4l, a.retained)
+    row_head(cv, sum(ROWS[2:]), json.load(open(a.flip)), a.questions, a.questions06)
+    row_controls(cv, sum(ROWS[3:]), a.questions, a.questions06)
+    row_fourlayer(cv, a.refit, a.parts, ROWS[4])
+    row_circuit(cv, a.parts, 0)
     fig.savefig(a.out, dpi=100)
 
 
