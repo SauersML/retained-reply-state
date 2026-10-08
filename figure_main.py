@@ -1,4 +1,4 @@
-"""The main figure (make_figure.sh), six rows.
+"""The main figure (make_figure.sh), seven rows.
   a-b  the experiment, and per model the share of other animals the hidden animal is ranked above at recall (each
        animal relative to its mean over runs; 50% = chance) in each condition; last column: the same three conditions in
        text on Goodfire's 4-layer model, as the raise of the hidden word's log P within its template (nats)
@@ -11,6 +11,8 @@
        top answer
   j    the 4-layer test's three conditions in plain text
   k    the 4-layer model's attention route of recall and the subcomponents that switch it (Graphviz, circuit_dot.py)
+  l-m  Qwen3-1.7B: head 21.6's attention to the reply against recall over 15 questions; the documents' effect with the
+       head working and switched off (Qwen3-1.7B and 0.6B)
 Paired p-values: sign flips (t statistic) of each run's paired difference in the hidden animal's log P relative to
 that animal's mean over runs; p against chance: re-pairing hidden animals.
 usage: make_figure.sh
@@ -39,7 +41,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [13.3, 11.5, 11.5, 11.5, 9.2, 12.9]  # heights of the six rows
+ROWS = [13.3, 11.5, 11.5, 11.5, 9.2, 12.9, 11.5]  # heights of the seven rows
 H = sum(ROWS)
 
 
@@ -631,6 +633,104 @@ def text_schematic(cv, x0, top):
     S.text(kx + 1.4, ky - 0.45, "blocked by the attention mask", fontsize=21, color=CORAL, va="center")
 
 
+MECH_ATT, MECH_WORD = "results/fp32/attention_all.npz", "results/fp32/wording_heldout_mac.npz"
+MECH_06 = "results/fp32/q06A_allq.npz"         # Qwen3-0.6B, every question with head 21.6 working and switched off
+
+
+def mean_ci(L, c, rng, B=2000):
+    """Mean over hidden animals of the per-animal rank, and its 95% interval from resampling hidden animals."""
+    a = per_animal(L, c)
+    boots = a[rng.integers(0, len(a), (B, len(a)))].mean(1)
+    return a.mean(), np.percentile(boots, 2.5), np.percentile(boots, 97.5)
+
+
+def row_mechanism(cv, y0, held, other):
+    """Panels l-m, occupying [y0, y0 + ROWS[6]].
+    l: Qwen3-1.7B held-out runs, for each of 15 turn-2 questions (the two recall wordings, minimal edits between them
+       (wording.py), the any-animal control, each recall question and the control after either document): head 21.6's
+       attention from the answer position to the reply (attention_runs.py) against recall.
+    m: the plain recall question alone, after the CPU explainer and after Janus's LLM explainer, with head 21.6 working
+       and switched off, in Qwen3-1.7B (held-out runs) and Qwen3-0.6B; points: mean over hidden animals, bars: 95%
+       interval from resampling hidden animals; p: paired sign flips against the question alone."""
+    if not all(os.path.exists(f) for f in (MECH_ATT, MECH_WORD, other)):
+        return
+    rng = np.random.default_rng(0)
+    top = y0 + ROWS[6]
+    S = cv.S
+    cv.letter(0.1, top - 0.75, "l")
+    z = np.load(MECH_ATT)
+    g = int(z["group"])
+    srcs = {"A": (held, "retained"), "B": (held, "recall_B"), "neutral": (held, "neutral")}
+    for k in ("doc_A", "cpu_A", "doc_B", "cpu_B", "doc_neutral", "cpu_neutral"):
+        srcs[k] = (held, k)
+    for k in ("preB_askA", "preA_askB", "preA_recall", "preA_introspect", "preA_reconstruct", "preA_introspect_which"):
+        srcs[k] = (MECH_WORD, k)
+    pts = {}
+    for k, (sp, arm) in srcs.items():
+        L, c = saved_logp(sp, f"none|{arm}")
+        pts[k] = (100 * z[k][:, 0, 6 * g:7 * g].mean(), per_animal(L, c).mean())
+    xs, ys = np.array(list(pts.values())).T
+    rho = np.corrcoef(xs, ys)[0, 1]
+    S.text(0.9, top - 0.75, f"Qwen3-1.7B: the less head 21.6 reads the reply, the higher the\nhidden animal ranks "
+           f"(15 questions, correlation {rho:.2f})", fontsize=25, weight="bold", va="center", linespacing=1.15)
+    ax = cv.axes(2.4, y0 + 1.75, 9.8, ROWS[6] - 4.1)
+    for k, (x, y) in pts.items():
+        col = GOLD if k.startswith("cpu") else (CORAL if k.startswith("doc") else BLUE)
+        ax.scatter([x], [y], s=190, color=col, edgecolor="white", lw=1.5, zorder=3)
+    lab = {"A": ("\u201cWhich animal did\nyou choose?\u201d", (-0.15, 0), "right", "center"),
+           "B": ("\u201cRecall, introspect, or reconstruct\u2026\u201d", (0.15, 0), "left", "center"),
+           }
+    for k, (t, (dx, dy), ha, va) in lab.items():
+        ax.text(pts[k][0] + dx, pts[k][1] + dy, t, fontsize=16, ha=ha, va=va, color=INK, linespacing=1.0)
+    ax.annotate("control: \u201cName one animal\u2026\u201d", xy=pts["neutral"], xytext=(1.25, 44.0), fontsize=16, color=INK,
+                ha="left", va="center", arrowprops=dict(arrowstyle="-", color=CLOUD, lw=1.3, shrinkB=7))
+    ax.annotate("both documents\nbefore each question", xy=pts["doc_A"], xytext=(1.6, 65.5), fontsize=16, color=INK,
+                ha="left", va="center", linespacing=1.0, arrowprops=dict(arrowstyle="-", color=CLOUD, lw=1.3, shrinkB=7))
+    ax.annotate("edits between the\ntwo recall questions", xy=pts["preA_reconstruct"], xytext=(3.2, 56.5), fontsize=16,
+                color=INK, ha="left", va="center", linespacing=1.0, arrowprops=dict(arrowstyle="-", color=CLOUD, lw=1.3, shrinkB=7))
+    ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
+    ax.set_xlim(0.4, 5.4)
+    ax.set_ylim(38, 69)
+    ax.set_xlabel("head 21.6's attention to the reply (% of the answer position's attention)")
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
+    for t, col, yy in (("question wordings", BLUE, 0.97), ("Janus's LLM explainer first", CORAL, 0.9), ("CPU explainer first", GOLD, 0.83)):
+        ax.text(0.98, yy, t, transform=ax.transAxes, ha="right", va="top", color=col, fontsize=17)
+
+    cv.letter(13.6, top - 0.75, "m")
+    S.text(14.4, top - 0.75, "switching head 21.6 off removes most of a document's effect in\nQwen3-1.7B and about half of it "
+           "in Qwen3-0.6B", fontsize=25, weight="bold", va="center", linespacing=1.15)
+    for x0, (model, spec, ylim) in zip((15.6, 22.1), (("Qwen3-1.7B", held, (32, 80)), ("Qwen3-0.6B", other, (8, 66)))):
+        ax = cv.axes(x0, y0 + 1.75, 5.4, ROWS[6] - 4.1)
+        for edit, col in (("none", BLUE), ("21:6*0", SLATE)):
+            Ls = [saved_logp(spec, f"{edit}|{q}") for q in ("retained", "cpu_A", "doc_A")]
+            c = Ls[0][1]
+            m = [mean_ci(L, c, rng) for L, _ in Ls]
+            ax.plot(range(3), [v[0] for v in m], "-", color=col, lw=3.2, zorder=2)
+            for x, (mu, lo, hi) in enumerate(m):
+                ax.plot([x, x], [lo, hi], color=col, lw=2.2, zorder=2)
+                ax.scatter([x], [mu], s=170, color=col, edgecolor="white", lw=1.5, zorder=3)
+            gl = [centred_logp(L, c) for L, _ in Ls]
+            up = edit != "none"                 # the gray line lies above the blue one: labels outside
+            for k, x in enumerate((1, 2)):
+                pv = p_paired(gl[k + 1] - gl[0], rng)
+                ax.text(x if up else x + 0.08, (m[k + 1][2] + 0.8) if up else (m[k + 1][1] - 0.8),
+                        "p<0.001" if pv < 1e-3 else f"p={pv:.1g}", fontsize=15, ha="center" if up else "left",
+                        va="bottom" if up else "top", color=col if pv < 0.05 else CLOUD,
+                        bbox=dict(facecolor="white", edgecolor="none", pad=0.5), zorder=4)
+        ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
+        ax.set_xticks(range(3), ["question\nalone", "CPU\nexplainer\nfirst", "Janus's\nexplainer\nfirst"], fontsize=17)
+        ax.tick_params(axis="x", length=0)
+        ax.set_xlim(-0.4, 2.4)
+        ax.set_ylim(*ylim)
+        ax.set_title(f"{model}: \u201cWhich animal did you choose?\u201d", fontsize=18, pad=10)
+        if model == "Qwen3-0.6B":                       # line labels where this panel has room
+            ax.text(2.35, 62.5, "head 21.6 switched off", color=SLATE, fontsize=17, ha="right", va="center")
+            ax.text(2.35, 40, "head 21.6 working", color=BLUE, fontsize=17, ha="right", va="center")
+        if model == "Qwen3-1.7B":
+            ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
+
+
+
 def row_circuit(cv, parts, y0):
     """Panel k, occupying [y0, y0 + ROWS[5]]: the 4-layer recall circuit's attention route and the VPD subcomponents
     measured to switch it (fourlayer/attention_gates.py), drawn by Graphviz."""
@@ -707,8 +807,9 @@ def main():
     row_head(cv, sum(ROWS[2:]), json.load(open(a.flip)), a.questions, a.questions06)
     row_controls(cv, sum(ROWS[3:]), a.questions, a.questions06)
     row_circuits(cv, a.refit, sum(ROWS[4:]))
-    row_schematic(cv, ROWS[5])
-    row_circuit(cv, a.parts, 0)
+    row_schematic(cv, sum(ROWS[5:]))
+    row_circuit(cv, a.parts, ROWS[6])
+    row_mechanism(cv, 0, a.questions.split("+")[0], MECH_06)
     fig.savefig(a.out, dpi=100)
 
 

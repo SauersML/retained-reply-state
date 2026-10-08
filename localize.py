@@ -7,9 +7,11 @@ stripped ones (computed without the thinking):
   kv heads      one key/value head retained, in one layer (layers given by --head-layers)
 Keys and values of layer l are read only by the attention of layer l, so a part whose retention alone reproduces the
 own-animal raise is where recall reads the hidden choice.  Readout and statistics as in hidden_choice.py / stats.py.
+--head-layers all scans every layer's key/value heads.
 """
 import argparse
 import json
+import os
 import time
 
 import numpy as np
@@ -30,12 +32,14 @@ def main():
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--only", default="", help="comma-separated arm kinds to run: layers, token, head")
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--dtype", default="float32", choices=["float32", "bfloat16"])
+    ap.add_argument("--resume", action="store_true", help="keep the arms already in OUT and run only the rest")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     d = json.load(open(a.result))
     TURN1, RECALL = prompts(d)
     tok = AutoTokenizer.from_pretrained(d["model"])
-    model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=torch.bfloat16, device_map=a.device,
+    model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=getattr(torch, a.dtype), device_map=a.device,
                                                  attn_implementation="sdpa").eval()
     inv_freq = model.model.rotary_emb.inv_freq.detach().cpu()
     chat = lambda msgs: tok.encode(tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True,
@@ -63,13 +67,17 @@ def main():
             lay = layers_of(model(torch.tensor([prompt + think + reply], device=a.device), use_cache=True).past_key_values)
             reply_kv.append([(shift_keys(k[:, :, -R:].cpu(), -len(think), inv_freq), v[:, :, -R:].cpu()) for k, v in lay])
 
+        # every cache on the device once: the per-arm copies and the batch expansion of the prompt then stay on the GPU
+        # (on the CPU they cost gigabytes of copies and transfers per batch)
+        dev = lambda kv: [(k.to(a.device), v.to(a.device)) for k, v in kv]
+        prompt_kv, strip_kv, reply_kv = dev(prompt_kv), dev(strip_kv), [dev(r) for r in reply_kv]
         arms = {}
         for lo in range(0, L_layers, a.band):
             arms[f"layers {lo}-{min(L_layers, lo + a.band) - 1}"] = ("layers", set(range(lo, min(L_layers, lo + a.band))), None)
         arms["all layers"] = ("layers", set(range(L_layers)), None)
         for t in range(R):
             arms[f"token {t} {tok.decode([reply[t]])!r}"] = ("token", t, None)
-        for l in [int(x) for x in a.head_layers.split(",") if x]:
+        for l in (range(L_layers) if a.head_layers == "all" else [int(x) for x in a.head_layers.split(",") if x]):
             for h in range(kv_heads):
                 arms[f"layer {l} kv-head {h}"] = ("head", l, h)
 
@@ -86,10 +94,10 @@ def main():
                 out.append((k, v))
             return out
 
-        results = {}
+        results = json.load(open(a.out))["arms"] if a.resume and os.path.exists(a.out) else {}
         t0 = time.time()
         for name, (kind, sel, h) in arms.items():
-            if a.only and kind not in a.only.split(","):
+            if a.only and kind not in a.only.split(",") or name in results:
                 continue
             L = np.concatenate([recall_logp(model, prompt_kv, [mixed(i, kind, sel, h) for i in range(s, min(n, s + a.batch))],
                                             suffix, forms, ANIMALS, a.device) for s in range(0, n, a.batch)])
