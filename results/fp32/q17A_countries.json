@@ -7,7 +7,7 @@
  "recall": "In the previous turn you chose one country from the list in your thinking. That thinking is not shown to you now. Which country did you choose? Answer in exactly this format: Country: <country>",
  "neutral": "Name one country from the list above, whichever you like. Answer in exactly this format: Country: <country>",
  "questions": {},
- "windows": "/Users/user/mpd-data/qwen3_fineweb/heldout/windows_T512.u32",
+ "windows": "windows_T512.u32",
  "web_windows": [
   0,
   270,

@@ -17,6 +17,7 @@ usage: edit_heads.py RESULT.json WINDOWS.u32 --edits "21:0*4;21:5*0,21:6*0;..." 
 """
 import argparse
 import json
+import os
 
 import numpy as np
 import torch
@@ -121,7 +122,7 @@ def main():
     rng = np.random.default_rng(0)
     res = {"model": d["model"], "result": a.result, "runs": n, "dtype": a.dtype, "turn1_drop": a.turn1_drop,
            "recall": RECALL, "neutral": NEUTRAL, "questions": dict(q.split("=", 1) for q in a.question),
-           "windows": a.windows, "web_windows": widx.tolist(), "edits": {}}
+           "windows": os.path.basename(a.windows), "web_windows": widx.tolist(), "edits": {}}
     saved = {}
     with torch.no_grad():
         for spec in ["none"] + [e for e in a.edits.split(";") if e]:

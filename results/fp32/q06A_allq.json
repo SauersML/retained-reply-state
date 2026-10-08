@@ -23,7 +23,7 @@
   "preA_reconstruct": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
   "preA_introspect_which": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Introspect: which animal did you choose? Answer in exactly this format: Animal: <animal>"
  },
- "windows": "/mnt/nw/home/s.sauers/rrs-data/windows_T512.u32",
+ "windows": "windows_T512.u32",
  "web_windows": [
   0,
   270,

@@ -7,7 +7,7 @@
  "recall": "In the preceding turn of this conversation, during your internal thinking, you chose one animal from the list. That thinking is not shown to you now. Recall, introspect, or reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
  "neutral": "Name one animal from the list above, whichever you like. Answer in exactly this format: Animal: <animal>",
  "questions": {},
- "windows": "/mnt/nw/home/s.sauers/rrs-data/windows_T512.u32",
+ "windows": "windows_T512.u32",
  "web_windows": [
   0,
   270,
