@@ -32,7 +32,7 @@
   ]
  },
  "args": {
-  "out": "results/fourlayer/edit_parts_sites.json",
+  "out": "results/fourlayer/edit_parts.json",
   "loss": "centered",
   "lambdas": "300,100,30,10,3,1",
   "mu": 0.001,
@@ -588,80 +588,6 @@
     "hidden_logp": -5.561039447784424,
     "mean_animal_logp": -8.011985778808594,
     "pile_kl": 0.0351508017629385
-   }
-  },
-  "site_left_out": {
-   "h.1.mlp.down_proj": {
-    "discrimination": 0.9224489795918369,
-    "raise": 1.4853222370147705,
-    "mean_rank": 12.88,
-    "top1": 0.14666666666666667,
-    "hidden_logp": -6.423606872558594,
-    "mean_animal_logp": -7.908928871154785,
-    "pile_kl": 0.03212851518765092
-   },
-   "h.2.attn.k_proj": {
-    "discrimination": 0.9708843537414965,
-    "raise": 2.2758400440216064,
-    "mean_rank": 9.283333333333333,
-    "top1": 0.26,
-    "hidden_logp": -5.6240925788879395,
-    "mean_animal_logp": -7.899932384490967,
-    "pile_kl": 0.032068793661892414
-   },
-   "h.2.attn.o_proj": {
-    "discrimination": 0.9699319727891157,
-    "raise": 1.9611295461654663,
-    "mean_rank": 9.8,
-    "top1": 0.2633333333333333,
-    "hidden_logp": -6.068492889404297,
-    "mean_animal_logp": -8.029622077941895,
-    "pile_kl": 0.032856172416359186
-   },
-   "h.2.attn.q_proj": {
-    "discrimination": 0.9604761904761907,
-    "raise": 2.017993688583374,
-    "mean_rank": 9.92,
-    "top1": 0.24,
-    "hidden_logp": -5.971291542053223,
-    "mean_animal_logp": -7.989285469055176,
-    "pile_kl": 0.03206713683903217
-   },
-   "h.2.attn.v_proj": {
-    "discrimination": 0.9736734693877552,
-    "raise": 2.3686881065368652,
-    "mean_rank": 8.81,
-    "top1": 0.3233333333333333,
-    "hidden_logp": -5.633741855621338,
-    "mean_animal_logp": -8.002429962158203,
-    "pile_kl": 0.035319467075169086
-   },
-   "h.3.attn.k_proj": {
-    "discrimination": 0.7245578231292517,
-    "raise": 0.5124155282974243,
-    "mean_rank": 20.72,
-    "top1": 0.03333333333333333,
-    "hidden_logp": -7.470120429992676,
-    "mean_animal_logp": -7.9825358390808105,
-    "pile_kl": 0.01571261347271502
-   },
-   "h.3.attn.q_proj": {
-    "discrimination": 0.8383673469387756,
-    "raise": 0.8392000198364258,
-    "mean_rank": 17.25,
-    "top1": 0.06333333333333334,
-    "hidden_logp": -7.218605041503906,
-    "mean_animal_logp": -8.057804107666016,
-    "pile_kl": 0.024592495057731867
-   },
-   "h.3.attn.v_proj": {
-    "discrimination": 0.9727891156462586,
-    "raise": 2.35532546043396,
-    "mean_rank": 8.926666666666666,
-    "top1": 0.31666666666666665,
-    "hidden_logp": -5.660327911376953,
-    "mean_animal_logp": -8.015654563903809,
-    "pile_kl": 0.034483025781810284
    }
   }
  }

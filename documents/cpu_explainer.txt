@@ -1,0 +1,42 @@
+<CPU_EXPLAINER_DOCUMENT>
+There are two distinct data highways in a modern processor core:
+- The pipeline: Flows forward through stages for each instruction
+- The memory hierarchy: Flows between caches and main memory at each level
+(by levels, I mean the small, fast memories (L1, L2, L3) that sit between the core and main memory, each larger and slower than the one before)
+
+At each stage for each instruction:
+1. The incoming instruction is fetched from the instruction cache for that stage
+2. The instruction is decoded into micro-operations, which are combined with operands read from the register file and sent, along with the original instruction, to the execution units
+3. The output of the execution unit, along with the original operands, is fed into the write-back stage, whose result is stored in the register file and sent to the next stage
+
+The load unit does the following:
+1. Compute an "address" based on a base register and an offset
+2. use the address and the tags of the L1 data cache to find which cache line holds the requested data, checking the L2 and L3 caches on a miss
+3. Use that line to copy the requested bytes into a register, which is then passed to the execution units
+
+This means:
+- The program counter encodes "given the current state, which instruction (what kind of operation) should run next?"
+- The address encodes "given the current state, which location (what kind of data) in memory should be read?"
+- The cache line encodes "given the current state, what bytes should the following instructions actually receive and pass forward in the program?"
+
+All three of these are wide values, sized to the machine word (and usually wider for vector registers). Cache lines are moved between levels without any compression, so they could in principle make basically all the data in a region of memory available to the execution units within a few cycles, provided the prefetcher has guessed the access pattern correctly and the line has not been evicted by another core sharing the same cache.
+
+A cache does not hold a full copy of all of main memory, but neither does the register file hold every value the program uses. The size of each level, also known as its capacity, is the bottleneck in both cases.
+
+Let's consider all the routes that an instruction can take through the core from fetch to retirement.
+
+Between point A (fetch of instruction i in cycle t) to point B (retirement of instruction i in cycle t + k), work flows.
+
+The instruction could:
+1. be decoded in cycle t + 1 [ONE stage], then wait in the reservation station until its operands are ready [ZERO or more cycles].
+2. be issued to an integer unit in cycle t + 2 [ONE stage], execute for one cycle, then wait in the reorder buffer [ONE or more cycles].
+3. be issued to a load unit, miss in the L1 cache [SEVERAL cycles], then be filled from the L2 cache [MORE cycles].
+
+The instruction needs to pass through a total of n=pipeline_stages stages and wait a total of m=stall_cycles cycles, but it can do them in any order the scheduler allows.
+
+The total number of schedules (or execution histories) is thus C(m+n, n), which becomes greater than any number a designer could test by hand quickly. This does not count the multiple ways the instruction can be reordered past its neighbours by the out-of-order engine, nor the extra paths created when a branch is predicted wrongly and the work after it is thrown away and fetched again.
+
+So at any moment in the program, the processor is not only running the current instruction, but often has dozens of instructions in flight, each moving through a different sequence of stages and then retired in program order. Due to the wide issue width and the many execution units, the reordering is usually not very costly, and the extra parallelism probably helps not only with speed but also hides much of the latency of slow memory accesses. It seems likely that well-written programs run at a high fraction of peak throughput, much like the designers intended.
+
+So, saying that a processor can only do one thing at a time, or can only finish instructions in the order it fetched them, is just dead wrong. The architecture permits it. It's a separate question how programs are actually leveraging these degrees of freedom in practice.
+</CPU_EXPLAINER_DOCUMENT>

@@ -27,6 +27,7 @@ from stats import animal_level
 
 INK, BLUE, PALE_BLUE, CORAL, PALE_CORAL = "#1d1d1f", "#2f6db5", "#dce8f6", "#e8684a", "#fbe3dc"
 SLATE, PALE_SLATE, RED, CLOUD = "#8e959c", "#eceef0", "#c8102e", "#cdd2d7"
+GOLD = "#c99a1e"
 CMAP = LinearSegmentedColormap.from_list("cb", [CORAL, "#f7f7f5", BLUE])
 FC_CMAP = LinearSegmentedColormap.from_list("fc", [CORAL, "#dcdcdc", BLUE])   # log2 fold change of a paired value
 FC_NORM = matplotlib.colors.Normalize(-1, 1)
@@ -325,6 +326,33 @@ def panel_paired(ax, pairs, lim):
     ax.set_xlim(-0.8, 3 * len(pairs) - 0.6)
 
 
+def panel_triple(ax, groups, lim):
+    """Per hidden animal, discrimination under three conditions over the same runs (gray, gold, blue), joined by
+    segments colored by their log2 fold change; groups: [(log P first, second, third, hidden animal per run)].
+    Brackets: p of each condition against the one to its left (sign flips of each run's paired difference in the
+    hidden animal's centered log P)."""
+    rng = np.random.default_rng(0)
+    xs = (0.0, 1.15, 2.3)
+    for k, (Ls, c) in enumerate(groups):
+        x = [4 * k + d for d in xs]
+        o = [per_animal(L, c) for L in Ls]
+        j = rng.uniform(-0.16, 0.16, o[0].size)
+        for i in range(2):
+            for a_, b_, jj, f in zip(o[i], o[i + 1], j, np.log2(o[i + 1] / o[i])):
+                ax.plot([x[i] + jj, x[i + 1] + jj], [a_, b_], color=FC_CMAP(FC_NORM(f)), lw=1.3, zorder=1)
+        for xi, oi, col in zip(x, o, (SLATE, GOLD, BLUE)):
+            ax.scatter(xi + j, oi, s=40, color=col, edgecolor="white", lw=0.5, zorder=3)
+            ax.plot([xi - 0.28, xi + 0.28], [oi.mean()] * 2, color=INK, lw=4.5, zorder=4, solid_capstyle="round")
+        g = [centred_logp(L, c) for L in Ls]
+        for i, yb in ((0, lim[1] - 6), (1, lim[1] - 18)):
+            d = g[i + 1] - g[i]
+            ax.plot([x[i], x[i], x[i + 1], x[i + 1]], [yb - 1.2, yb, yb, yb - 1.2], color=SLATE, lw=1.2, zorder=2)
+            p_text(ax, (x[i] + x[i + 1]) / 2, yb + 6.5, p_paired(d, rng), d.mean(), fontsize=16)
+    ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
+    ax.set_ylim(*lim)
+    ax.set_xlim(-0.7, 4 * len(groups) - 1.0)
+
+
 def paired_legend(cv, x, y, left, right):
     cv.S.scatter([x], [y], s=110, color=SLATE)
     cv.S.text(x + 0.25, y, left, fontsize=20, color=SLATE, va="center")
@@ -337,7 +365,8 @@ def row_head(cv, y0, flip_groups, npz):
     """Panels c-e, Qwen3-1.7B, occupying [y0, y0 + ROWS[1]].
     c: layer 21 head 6 switched off on several datasets, other heads as controls (edit_heads.py)
     d: per hidden animal, each question, original model and head 21.6 switched off (edit_heads.py --save-logp)
-    e: per hidden animal, each question alone and after Janus's LLM explainer (edit_heads.py --question)"""
+    e: per hidden animal, each question alone, after a CPU explainer of the same length and style, and after Janus's
+       LLM explainer (edit_heads.py --question)"""
     top = y0 + ROWS[1]
     cv.letter(0.1, top - 0.75, "c")
     cv.S.text(0.9, top - 0.75, "Qwen3-1.7B: switching off one attention\nhead (layer 21, head 6) raises\nintrospection, across datasets",
@@ -365,21 +394,29 @@ def row_head(cv, y0, flip_groups, npz):
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
 
     cv.letter(19.0, top - 0.75, "e")
-    cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the question:\nraises recall of the hidden animal in\nQwen3-1.7B, lowers it in Qwen3-0.6B",
+    cv.S.text(19.8, top - 0.75, "an unrelated document moves recall\nas much as Janus's LLM explainer\n(Qwen3-1.7B) or more (Qwen3-0.6B)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
-    other = "results/q06A/q06A_questions.npz"
-    qs = [(npz, "retained", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"), (npz, "recall_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
-          (npz, "neutral", "doc_neutral", "1.7B, control:\n\u201cName any\nanimal\u201d"), (other, "retained", "doc_A", "0.6B:\n\u201cWhich\nanimal\u2026?\u201d")]
-    qs = [q for q in qs if saved_logp(q[0], f"none|{q[2]}")[0] is not None]
-    ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.9)
-    panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{q1}")[0], saved_logp(sp, f"none|{q0}")[1])
-                      for sp, q0, q1, _ in qs], (15, 102))
-    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
+    for i, (col, lab) in enumerate(((SLATE, "question alone"), (GOLD, "CPU explainer of the same length first"),
+                                    (BLUE, "Janus's LLM explainer first"))):
+        x = 20.0 + (0, 2.85, 0)[i]
+        y = top - 2.05 - (0, 0, 0.5)[i]
+        cv.S.scatter([x], [y], s=110, color=col)
+        cv.S.text(x + 0.25, y, lab, fontsize=19, color=col, va="center")
+    cpu = "results/q17A/q17A_cpu.npz+results/q17A/q17A_cpu_set2.npz"
+    other, other_cpu = "results/q06A/q06A_questions.npz", "results/q06A/q06A_cpu.npz"
+    qs = [(npz, cpu, "retained", "cpu_A", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"),
+          (npz, cpu, "recall_B", "cpu_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
+          (npz, cpu, "neutral", "cpu_neutral", "doc_neutral", "1.7B, control:\n\u201cName any\nanimal\u201d"),
+          (other, other_cpu, "retained", "cpu_A", "doc_A", "0.6B:\n\u201cWhich\nanimal\u2026?\u201d")]
+    qs = [q for q in qs if saved_logp(q[1], f"none|{q[3]}")[0] is not None and saved_logp(q[0], f"none|{q[4]}")[0] is not None]
+    ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.5)
+    panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
+                       saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (5, 120))
+    ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
-    ax.set_yticks([30, 50, 70, 90])
-    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, 5.9))
+    ax.set_yticks([10, 30, 50, 70, 90])
+    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, 5.5))
     cb.set_ticks([-1, 0, 1], labels=["½×", "1×", "2×"])
     cb.set_label("change per line (d, e)", fontsize=16, labelpad=2)
     cb.ax.tick_params(labelsize=17)
