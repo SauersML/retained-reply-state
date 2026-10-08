@@ -7,13 +7,16 @@ recomputed.
   1. candidates: VPD's causal-importance network, run on the same texts (unmasked, as it was trained), lists the
      subcomponents with mean importance above --ci at each position class (a filter only, not evidence: the network
      sees the whole text in both directions);
-  2. each candidate is removed alone; recall lost = recall (share of other words the hidden word is ranked above, each
-     word relative to its mean over texts) of the unedited model minus recall with the node removed, on screening
-     templates, and the largest are measured again on all 48 templates;
+  2. each candidate is removed alone; recall lost = the unedited model's raise (the hidden word's log P minus its mean
+     within the template, nats; hidden_span.template_measures) minus the raise with the node removed, on screening
+     templates, and the largest losses and the largest gains are measured again on all 48 templates; with --kl-top, the
+     strongest of each are also removed at every position of held-out Pile text and their KL(unedited || removed)
+     measured, to tell circuit parts from general disruptors;
   3. the circuit is the smallest set of nodes, taken in order of their single losses, whose joint removal takes recall
      to within --rest of chance; random sets of candidates of the same size are removed for comparison;
   4. edges: each circuit node is removed and every later circuit node's activity (x.v where it acts) is measured; the
      change, relative to that node's mean |activity|, is the edge (a total effect, through every path).
+With --screen-only, steps 3-4 are skipped.
 usage: subcomponent_circuit.py --out subcomponent_circuit.json
 """
 import argparse
@@ -27,8 +30,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, vm
-from discrimination import accuracy
+from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, template_measures, vm
 from tokenizers import Tokenizer
 
 CLASSES = ("frame", "word", "later", "cue")
@@ -39,7 +41,10 @@ def main():
     ap.add_argument("--ci", type=float, default=0.1, help="mean causal importance a candidate needs at a position class")
     ap.add_argument("--screen", type=int, default=12, help="templates used to screen candidates")
     ap.add_argument("--confirm", type=int, default=60, help="candidates measured again on all templates")
-    ap.add_argument("--rest", type=float, default=0.02, help="joint removal must leave recall within this of chance")
+    ap.add_argument("--rest", type=float, default=0.05, help="joint removal must leave this share of the raise or less")
+    ap.add_argument("--gains", type=int, default=20, help="largest gains measured again on all templates")
+    ap.add_argument("--kl-top", type=int, default=10, help="Pile KL of this many of the largest losses and gains")
+    ap.add_argument("--screen-only", action="store_true")
     ap.add_argument("--nodes", default="", help="JSON list of nodes site#idx@class: skip the screen, measure these")
     ap.add_argument("--out", default=os.path.join(RESULTS, "subcomponent_circuit.json"))
     a = ap.parse_args()
@@ -101,7 +106,7 @@ def main():
 
     def recall(temps, removed=()):
         L_ = np.concatenate([torch.log_softmax(forward(s, p, m, removed), -1)[:, animal_ids].numpy() for s, p, m in temps])
-        return float(accuracy(L_, np.tile(np.arange(len(ANIMALS)), len(temps))))
+        return template_measures(L_, np.tile(np.arange(len(ANIMALS)), len(temps)))["raise"]
 
     base = recall(templates)
     if a.nodes:                                                  # given nodes: their single losses and the edges between them
@@ -109,7 +114,7 @@ def main():
         circuit = [parse(k) for k in json.load(open(a.nodes))]
         confirmed = {n: base - recall(templates, [n]) for n in circuit}
         single, cands, top, joint, random_sets = dict(confirmed), circuit, circuit, [recall(templates, circuit)], []
-        print(f"{len(circuit)} given nodes removed together: recall {100 * joint[0]:.1f}%", flush=True)
+        print(f"{len(circuit)} given nodes removed together: raise {joint[0]:.4f}", flush=True)
     else:
         circuit = None
 
@@ -126,17 +131,41 @@ def main():
         print(f"{len(cands)} candidate nodes (mean importance > {a.ci})", flush=True)
 
         base_screen, base = recall(screen), recall(templates)
-        print(f"recall: screening templates {100 * base_screen:.1f}%, all {100 * base:.1f}%", flush=True)
+        print(f"raise: screening templates {base_screen:.4f}, all {base:.4f} nats", flush=True)
         single = {}
         for j, node in enumerate(cands):
             single[node] = base_screen - recall(screen, [node])
             if j % 200 == 0:
                 print(f"  screened {j}/{len(cands)}", flush=True)
         top = sorted(cands, key=lambda n: -single[n])[:a.confirm]
-        confirmed = {n: base - recall(templates, [n]) for n in top}
+        gains = sorted(cands, key=lambda n: single[n])[:a.gains]
+        confirmed = {n: base - recall(templates, [n]) for n in top + gains}
         ranked = sorted(top, key=lambda n: -confirmed[n])
         for n in ranked[:20]:
-            print(f"  {n[0]}#{n[1]} at {n[2]}: recall lost {100 * confirmed[n]:.1f} points", flush=True)
+            print(f"  {n[0]}#{n[1]} at {n[2]}: raise lost {confirmed[n]:+.4f} nats ({confirmed[n] / base:+.0%})", flush=True)
+        for n in sorted(gains, key=lambda n: confirmed[n])[:10]:
+            print(f"  {n[0]}#{n[1]} at {n[2]}: raise gained {-confirmed[n]:+.4f} nats ({-confirmed[n] / base:+.0%})", flush=True)
+        kl = {}
+        if a.kl_top:
+            pile = vm.val_tokens(16, 256, 2048)
+            with torch.no_grad():
+                ref = [torch.log_softmax(model(pile[j:j + 4]).float(), -1) for j in range(0, len(pile), 4)]
+            for n in ranked[:a.kl_top] + sorted(gains, key=lambda n: confirmed[n])[:a.kl_top]:
+                U, V = UV[n[0]]
+                hook = model.site(n[0]).register_forward_hook(
+                    lambda m, inp, out, u=U[n[1]], v=V[:, n[1]]: out - (inp[0] @ v)[..., None] * u)
+                with torch.no_grad():
+                    tot = sum(float((r.exp() * (r - torch.log_softmax(model(pile[j:j + 4]).float(), -1))).sum(-1).sum())
+                              for r, j in zip(ref, range(0, len(pile), 4)))
+                hook.remove()
+                kl[n] = tot / pile.numel()
+                print(f"  KL of removing {n[0]}#{n[1]} everywhere: {kl[n]:.4f} nats per token", flush=True)
+        if a.screen_only:
+            key = lambda n: f"{n[0]}#{n[1]}@{n[2]}"
+            json.dump({"raise": base, "n_candidates": len(cands), "ci_threshold": a.ci,
+                       "single_screen": {key(n): single[n] for n in cands}, "single": {key(n): confirmed[n] for n in confirmed},
+                       "kl_everywhere": {key(n): v for n, v in kl.items()}}, open(a.out, "w"), indent=1)
+            return
 
         # 3. the smallest set, in order of single losses, whose joint removal reaches chance
         circuit, joint = [], []
@@ -144,12 +173,12 @@ def main():
             circuit.append(n)
             r = recall(templates, circuit)
             joint.append(r)
-            print(f"  first {len(circuit)} removed together: recall {100 * r:.1f}%", flush=True)
-            if r - 0.5 <= a.rest:
+            print(f"  first {len(circuit)} removed together: raise {r:.4f}", flush=True)
+            if r <= a.rest * base:
                 break
         random_sets = [recall(templates, [cands[i] for i in rng.choice(len(cands), len(circuit), replace=False)]) for _ in range(5)]
-        print(f"circuit of {len(circuit)} nodes: removed together {100 * joint[-1]:.1f}%; random sets of {len(circuit)}: "
-              + ", ".join(f"{100 * r:.1f}%" for r in random_sets), flush=True)
+        print(f"circuit of {len(circuit)} nodes: removed together raise {joint[-1]:.4f}; random sets of {len(circuit)}: "
+              + ", ".join(f"{r:.4f}" for r in random_sets), flush=True)
 
     # 4. edges: remove each circuit node, measure every later circuit node's activity
     layer = lambda n: int(n[0].split(".")[1])

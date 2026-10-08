@@ -5,7 +5,10 @@ and keys at the word.  Read step: heads 3.4 and 3.5's attention from the last cu
 layer 3's queries at the cue and keys at the later tokens.  Candidates: the subcomponents with the largest mean
 |x.v| times |u in the head's slice| where they act; each is removed there alone (output minus (x.v) u, everything
 later recomputed, retained condition, all 48 templates), and the change in the head's attention and in recall is
-measured.
+measured.  Recall: hidden_span.template_measures (the raise of the hidden word's log P within its template, nats, and
+the within-template discrimination and top-1); a gate's effect is its change in raise.  The raise is also recorded on
+the first three frames and the last three separately ("halves"), so gates can be chosen on one half and tested on the
+other.
 usage: attention_gates.py --out attention_gates.json
 """
 import argparse
@@ -19,8 +22,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, vm
-from discrimination import accuracy
+from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, template_measures, vm
 from tokenizers import Tokenizer
 
 
@@ -89,13 +91,18 @@ def main():
                 z = z + model.site(n("down_proj"))(vm.gelu_tanh(model.site(n("c_fc"))(hh)))
             out = vm.rms(z, model.ln_f, model.eps)[:, -1] @ model.wte.T
             logp.append(torch.log_softmax(out, -1)[:, animal_ids].numpy())
-        return float(accuracy(np.concatenate(logp), chosen)), float(np.mean(att23)), np.mean(att3, 0).tolist(), acts
+        L_ = np.concatenate(logp)
+        half = len(L_) // 2                       # templates run frame by frame: first half = frames 0-2, second = 3-5
+        m = template_measures(L_, chosen)
+        m["halves"] = [template_measures(L_[:half], chosen[:half])["raise"], template_measures(L_[half:], chosen[half:])["raise"]]
+        return m, float(np.mean(att23)), np.mean(att3, 0).tolist(), acts
 
     base, b23, b3, acts = run()
-    print(f"unedited: recall {100 * base:.1f}%, head 2.3 later->word {b23:.3f}, heads 3.4/3.5 cue->later {b3[0]:.3f}/{b3[1]:.3f}", flush=True)
+    print(f"unedited: raise {base['raise']:.4f} nats, discrimination {100 * base['discrimination']:.1f}%, top-1 "
+          f"{100 * base['top1']:.1f}%, head 2.3 later->word {b23:.3f}, heads 3.4/3.5 cue->later {b3[0]:.3f}/{b3[1]:.3f}", flush=True)
     plan = [("h.2.attn.q_proj", "later", 3), ("h.2.attn.k_proj", "word", 3),
             ("h.3.attn.q_proj", "cue", (4, 5)), ("h.3.attn.k_proj", "later", (4, 5))]
-    out = {"recall": base, "att_2_3": b23, "att_3_45": b3, "gates": {}}
+    out = {"unedited": base, "att_2_3": b23, "att_3_45": b3, "gates": {}}
     for site, cls, heads in plan:
         U, V = UV[site]
         hs = heads if isinstance(heads, tuple) else (heads,)
@@ -104,8 +111,9 @@ def main():
         for idx in strength.argsort(descending=True)[:a.cands].tolist():
             r, a23, a3, _ = run([(site, idx, cls)])
             key = f"{site}#{idx}@{cls}"
-            out["gates"][key] = {"recall": r, "att_2_3": a23, "att_3_45": a3, "strength": float(strength[idx])}
-            print(f"  without {key:28s}: recall {100 * r:5.1f}%  head 2.3 {a23:.3f} ({a23 / b23 - 1:+.0%})  "
+            out["gates"][key] = dict(r, raise_change=r["raise"] - base["raise"], raise_change_share=r["raise"] / base["raise"] - 1,
+                                     att_2_3=a23, att_3_45=a3, strength=float(strength[idx]))
+            print(f"  without {key:28s}: raise {r['raise']:.4f} ({r['raise'] / base['raise'] - 1:+.0%})  head 2.3 {a23:.3f} ({a23 / b23 - 1:+.0%})  "
                   f"heads 3.4/3.5 {a3[0]:.3f}/{a3[1]:.3f} ({a3[0] / b3[0] - 1:+.0%}/{a3[1] / b3[1] - 1:+.0%})", flush=True)
             json.dump(out, open(a.out, "w"), indent=1)
 

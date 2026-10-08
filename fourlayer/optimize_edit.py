@@ -3,9 +3,12 @@
 One log-scale s_i per VPD subcomponent u_i v_i^T of the attention sites of layers 2 and 3 (with --mlp1 also layer 1's
 down_proj): W -> W + sum_i (exp(s_i) - 1) u_i v_i^T at every position, one hook per site. Adam minimizes
   task + lambda * KL(unedited || edited) on training Pile windows + mu * sum_i |s_i|
-where task is, in "retained", minus the hidden word's log P relative to its mean over the batch's runs (the softmax
-normalizer cancels in it, so only the 50 animal logits are needed) or, with --loss pairwise, the logistic surrogate of
-discrimination (softplus of minus the hidden word's margin over each other animal, both taken relative to their means).
+where task is, in "retained", minus the hidden word's log P relative to its mean over the runs of the same template
+(each template has every word once; the softmax normalizer cancels in it, so only the 50 animal logits are needed) or,
+with --loss pairwise, the logistic surrogate of discrimination (softplus of minus the hidden word's margin over each
+other animal, both taken relative to their means within the template).  Held-out recall: hidden_span.template_measures
+(the raise of the hidden word's log P within its template, nats; within-template discrimination; top-1: the hidden word
+has the highest log P of the 50 words).
 lambda runs from large to small, each solution warm-starting the next; each solution is evaluated as learned, with
 every |s_i| <= 0.05 set to 0 (the edit that is saved and listed), and with --top-k cut to its K largest |s_i|.
 Layers 0-1 run once: layer 1's down_proj edit is added from its cached input, and only layers 2-3 run per step (layer 3
@@ -28,18 +31,16 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from hidden_span import ANIMALS, FRAMES, MIDDLES, MASK, RESULTS, masks, vm
-from stats import raises
-from discrimination import accuracy
+from hidden_span import ANIMALS, FRAMES, MIDDLES, MASK, RESULTS, masks, template_measures, vm
 from tokenizers import Tokenizer
 
 
 def frontier(points):
-    """The points ({"kl", "discrimination", ...}) not beaten in held-out discrimination by any point of lower or equal KL."""
+    """The points ({"kl", "top1", ...}) not beaten in held-out top-1 by any point of lower or equal KL."""
     best, out = -1.0, []
-    for p in sorted(points, key=lambda p: (p["kl"], -p["discrimination"])):
-        if p["discrimination"] > best:
-            best = p["discrimination"]
+    for p in sorted(points, key=lambda p: (p["kl"], -p["top1"])):
+        if p["top1"] > best:
+            best = p["top1"]
             out.append(p)
     return out
 
@@ -173,20 +174,21 @@ def main():
             c = np.tile(np.arange(len(ANIMALS)), len(test))
             L = task_logp(test, "retained")
             rank = (L > L[np.arange(len(c)), c][:, None]).sum(1) + 1
-            r = {"discrimination": float(accuracy(L, c)), "raise": float(raises(L, c).mean()), "mean_rank": float(rank.mean()),
-                 "top1": float(np.mean(rank == 1)), "hidden_logp": float(L[np.arange(len(c)), c].mean()), "mean_animal_logp": float(L.mean()), "pile_kl": pile_kl()}
+            r = dict(template_measures(L, c), mean_rank=float(rank.mean()), hidden_logp=float(L[np.arange(len(c)), c].mean()),
+                     mean_animal_logp=float(L.mean()), pile_kl=pile_kl())
             if full:
                 Lv, Ls = task_logp(test, "visible"), task_logp(test, "stripped")
-                r.update(visible_discrimination=float(accuracy(Lv, c)), visible_raise=float(raises(Lv, c).mean()),
-                         stripped_discrimination=float(accuracy(Ls, c)), stripped_max_spread=float(np.abs(Ls.reshape(len(test), 50, 50) - Ls.reshape(len(test), 50, 50)[:, :1]).max()))
+                mv, ms = template_measures(Lv, c), template_measures(Ls, c)
+                r.update(visible_discrimination=mv["discrimination"], visible_raise=mv["raise"], visible_top1=mv["top1"],
+                         stripped_discrimination=ms["discrimination"], stripped_max_spread=float(np.abs(Ls.reshape(len(test), 50, 50) - Ls.reshape(len(test), 50, 50)[:, :1]).max()))
                 ce = np.tile(np.arange(len(ANIMALS)), len(every))
-                Le = task_logp(every, "retained")
-                r.update(all48_discrimination=float(accuracy(Le, ce)), all48_raise=float(raises(Le, ce).mean()))
+                me = template_measures(task_logp(every, "retained"), ce)
+                r.update(all48_discrimination=me["discrimination"], all48_raise=me["raise"], all48_top1=me["top1"])
         return r
 
     def show(name, r):
-        print(f"{name:72s} held-out discr {100 * r['discrimination']:.1f}%  raise {r['raise']:+.3f}  rank {r['mean_rank']:4.1f}  "
-              f"Pile KL {r['pile_kl']:.4f}", flush=True)
+        print(f"{name:72s} held-out top-1 {100 * r['top1']:.1f}%  raise {r['raise']:+.3f}  discr {100 * r['discrimination']:.1f}%  "
+              f"rank {r['mean_rank']:4.1f}  Pile KL {r['pile_kl']:.4f}", flush=True)
 
     out = {"split": split, "args": vars(a), "sites": sites}
     out["unedited"] = evaluate(full=True)
@@ -236,7 +238,7 @@ def main():
     if a.support:
         path, index = a.support.rsplit(":", 1)
         ranked = list(json.load(open(path))["optimized"][int(index)]["scales"])
-        rounds = [(float(a.lambdas.split(",")[0]), int(k)) for k in a.k.split(",")]
+        rounds = [(float(a.lambdas.split(",")[0]), int(k)) for k in a.k.split(",") if int(k) <= len(ranked)]
         out["support"] = a.support
     opt = torch.optim.Adam(list(logs.values()), lr=a.lr)
     for lam, k_support in rounds:
@@ -255,7 +257,8 @@ def main():
                     DELTA[s] = torch.expm1(logs[s] * keep[s])
             z = torch.cat([tail(*train_pre[t], train[t][1]["retained"], True)[:, 0] @ wa.T
                            for t in rng.choice(len(train), a.templates, replace=False)])
-            Dz = z - z.mean(0)
+            zt = z.view(a.templates, len(ANIMALS), len(ANIMALS))          # [template, run, word]
+            Dz = (zt - zt.mean(1, keepdim=True)).reshape(len(z), len(ANIMALS))
             own = Dz[torch.arange(len(z)), c_batch]
             if a.loss == "centered":
                 task = -own.mean()
@@ -301,10 +304,10 @@ def main():
         show(f"optimized {a.loss} lambda {lam:g} unpruned", r_dense)
         show(f"optimized {a.loss} lambda {lam:g} ({len(scales)} with |s| > 0.05 kept)", r)
         print(f"    visible discr {100 * r['visible_discrimination']:.1f}%  stripped {100 * r['stripped_discrimination']:.1f}%  "
-              f"all-48 discr {100 * r['all48_discrimination']:.1f}%  mean animal log P {r['mean_animal_logp']:.3f}", flush=True)
-        out["frontier"] = frontier([{"kl": o["metrics"]["pile_kl"], "discrimination": o["metrics"]["discrimination"], "lambda": o["lambda"],
+              f"all-48 top-1 {100 * r['all48_top1']:.1f}%  mean animal log P {r['mean_animal_logp']:.3f}", flush=True)
+        out["frontier"] = frontier([{"kl": o["metrics"]["pile_kl"], "top1": o["metrics"]["top1"], "lambda": o["lambda"],
                                      "mu": o["mu"], "loss": a.loss, "n_subcomponents": o["n_moved"]} for o in out["optimized"]])
-        out["hand_picked_frontier"] = frontier([{"kl": r["pile_kl"], "discrimination": r["discrimination"], "edit": k}
+        out["hand_picked_frontier"] = frontier([{"kl": r["pile_kl"], "top1": r["top1"], "edit": k}
                                                 for k, r in out["hand_picked"].items()])
         json.dump(out, open(a.out, "w"), indent=1)
 

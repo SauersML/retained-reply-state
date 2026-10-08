@@ -4,11 +4,13 @@
               and 3.5 from the cue to the later tokens); sufficiency: block every other head's routes, keep the circuit's
   gates       remove together the subcomponents that switch the routes on (layer-2 keys at the word, layer-2 query at the
               later tokens, layer-3 key at the later tokens, layer-3 query at the cue) and, separately, those that hold
-              them back (layer-3 queries at the cue); against random sets of the same size from the same matrices and
-              positions
+              them back (layer-3 queries at the cue); against random sets of the same size drawn from the same pool they
+              were chosen from (attention_gates.py's 40 most active subcomponents of the same matrix and position)
   frames      each gate set's effect on each of the 6 sentence frames separately (same sign everywhere?)
   mediation   over all single gates measured by attention_gates.py: does the change in the head's attention predict the
               change in recall?
+Recall: hidden_span.template_measures (raise of the hidden word's log P within its template, nats; within-template
+discrimination; top-1).
 usage: stress_circuit.py --out stress_circuit.json
 """
 import argparse
@@ -22,8 +24,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, vm
-from discrimination import accuracy
+from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, template_measures, vm
 from tokenizers import Tokenizer
 
 NEED = [("h.2.attn.k_proj", 224, "word"), ("h.2.attn.k_proj", 206, "word"), ("h.2.attn.q_proj", 436, "later"),
@@ -33,7 +34,8 @@ HOLD = [("h.3.attn.q_proj", 334, "cue"), ("h.3.attn.q_proj", 60, "cue")]
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--random", type=int, default=8)
+    ap.add_argument("--random", type=int, default=16)
+    ap.add_argument("--gates", default=os.path.join(RESULTS, "attention_gates.json"))
     ap.add_argument("--out", default=os.path.join(RESULTS, "stress_circuit.json"))
     a = ap.parse_args()
     torch.set_grad_enabled(False)
@@ -93,51 +95,65 @@ def main():
             logits = vm.rms(z, model.ln_f, model.eps)[:, -1] @ model.wte.T
             out.append(torch.log_softmax(logits, -1)[:, animal_ids].numpy())
         Lp = np.concatenate(out)
-        return float(accuracy(Lp, np.tile(np.arange(len(ANIMALS)), len(temps))))
+        return template_measures(Lp, np.tile(np.arange(len(ANIMALS)), len(temps)))
 
     res = {}
     base = run()
-    res["recall"] = base
+    res["unedited"] = base
+    fmt = lambda m: f"raise {m['raise']:.4f} ({m['raise'] / base['raise'] - 1:+.0%}), discrimination {100 * m['discrimination']:.1f}%, top-1 {100 * m['top1']:.1f}%"
     copy, read = [("copy", 2, 3)], [("read", 3, 4), ("read", 3, 5)]
     others = [(r, l, h) for r in ("copy", "read") for l in range(L) for h in range(H) if (r, l, h) not in copy + read]
     res["routes"] = {"circuit blocked": run(blocked=copy + read), "copy step blocked": run(blocked=copy),
                      "read step blocked": run(blocked=read), "only the circuit open": run(blocked=others),
                      "every route blocked": run(blocked=copy + read + others)}
-    print(f"recall {100 * base:.1f}%; " + "; ".join(f"{k} {100 * v:.1f}%" for k, v in res["routes"].items()), flush=True)
+    print(f"unedited: {fmt(base)}", flush=True)
+    for k, v in res["routes"].items():
+        print(f"  {k}: {fmt(v)}", flush=True)
+
+    g = json.load(open(a.gates))
+    chosen_keys = {f"{s}#{i}@{c}" for s, i, c in NEED + HOLD}
+    pool = {}
+    for key in g["gates"]:
+        if key not in chosen_keys:
+            site, rest = key.split("#")
+            pool.setdefault((site, rest.split("@")[1]), []).append(int(rest.split("@")[0]))
 
     def random_like(gates):
-        picks = []
+        """Same matrices and positions, drawn without replacement from the pool the gates were chosen from."""
+        picks, used = [], set()
         for site, idx, cls in gates:
-            j = int(rng.integers(len(UV[site][0])))
+            j = int(rng.choice([i for i in pool[(site, cls)] if (site, i) not in used]))
+            used.add((site, j))
             picks.append((site, j, cls))
         return picks
 
     for name, gates in (("needed gates removed", NEED), ("holding gates removed", HOLD)):
         r = run(removed=gates)
         rand = [run(removed=random_like(gates)) for _ in range(a.random)]
-        res[name] = {"recall": r, "random": rand}
-        print(f"{name}: {100 * r:.1f}%; random sets of {len(gates)}: " + ", ".join(f"{100 * x:.1f}" for x in rand), flush=True)
+        res[name] = {"measures": r, "random": rand}
+        print(f"{name}: {fmt(r)}; random sets of {len(gates)}, raise: " + ", ".join(f"{x['raise']:.3f}" for x in rand), flush=True)
 
     res["frames"] = {}
     for f in range(len(FRAMES)):
         temps = [t for t in templates if t[4] == f]
         b = run(temps=temps)
-        res["frames"][FRAMES[f]] = {"recall": b, "needed gates removed": run(removed=NEED, temps=temps),
+        res["frames"][FRAMES[f]] = {"unedited": b, "needed gates removed": run(removed=NEED, temps=temps),
                                     "holding gates removed": run(removed=HOLD, temps=temps)}
         v = res["frames"][FRAMES[f]]
-        print(f"  frame '{FRAMES[f]}': {100 * b:.1f}% -> needed removed {100 * v['needed gates removed']:.1f}%, "
-              f"holding removed {100 * v['holding gates removed']:.1f}%", flush=True)
+        print(f"  frame '{FRAMES[f]}': raise {b['raise']:.4f} -> needed removed {v['needed gates removed']['raise']:.4f}, "
+              f"holding removed {v['holding gates removed']['raise']:.4f}", flush=True)
 
-    g = json.load(open(os.path.join(RESULTS, "attention_gates.json")))
     da, dr = [], []
     for k, v in g["gates"].items():
         if k.startswith("h.2"):
             da.append(v["att_2_3"] / g["att_2_3"] - 1)
         else:
             da.append(np.mean(v["att_3_45"]) / np.mean(g["att_3_45"]) - 1)
-        dr.append(v["recall"] - g["recall"])
-    res["mediation"] = {"corr_attention_recall": float(np.corrcoef(da, dr)[0, 1]), "n": len(da)}
-    print(f"mediation: correlation of attention change and recall change over {len(da)} gates: {res['mediation']['corr_attention_recall']:+.2f}", flush=True)
+        dr.append(v["raise_change"])
+    rank = lambda x: np.argsort(np.argsort(x))
+    res["mediation"] = {"pearson": float(np.corrcoef(da, dr)[0, 1]), "spearman": float(np.corrcoef(rank(da), rank(dr))[0, 1]), "n": len(da)}
+    print(f"mediation over {len(da)} gates: attention change vs raise change, Pearson {res['mediation']['pearson']:+.2f}, "
+          f"Spearman {res['mediation']['spearman']:+.2f}", flush=True)
     json.dump(res, open(a.out, "w"), indent=1)
 
 

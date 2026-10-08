@@ -19,8 +19,15 @@ import json
 import numpy as np
 
 
-def raises(L, c):
-    return L[np.arange(len(c)), c] - L.mean(0)[c]
+def raises(L, c, groups=None):
+    """Per run, the hidden animal's log P minus that animal's mean over all runs (or over the runs of the same group)."""
+    if groups is None:
+        return L[np.arange(len(c)), c] - L.mean(0)[c]
+    out = np.empty(len(c))
+    for g in np.unique(groups):
+        m = groups == g
+        out[m] = L[m][np.arange(m.sum()), c[m]] - L[m].mean(0)[c[m]]
+    return out
 
 
 def run_level(L, c, rng, B=20000):

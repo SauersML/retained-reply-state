@@ -3,7 +3,10 @@
 For each link of the path (head 2.3's value map at the hidden word, its output map at the later tokens, heads 3.4/3.5's
 value maps at the later tokens, their output maps at the cue), the K subcomponents that carry the most of the
 weights-only copy are removed where that link acts (output minus (x.v) u, everything later recomputed, retained
-condition, all 48 templates), and recall is compared with removing K random subcomponents of the same matrix.
+condition, all 48 templates), and recall is compared with removing K random subcomponents of the same matrix drawn from
+its 100 most active at that position (mean |x.v|).  Each link's subcomponents are ranked by their largest share of the
+copy (gain_lost) over the two read heads.  Recall: hidden_span.template_measures (raise of the hidden word's log P
+within its template, nats).
 usage: chain_test.py --chain chain_composition.json --out chain_test.json
 """
 import argparse
@@ -17,8 +20,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, vm
-from discrimination import accuracy
+from hidden_span import ANIMALS, FRAMES, MIDDLES, RESULTS, template_measures, vm
 from tokenizers import Tokenizer
 
 
@@ -52,6 +54,8 @@ def main():
         templates.append((seq, pos, mask))
     chosen = np.tile(np.arange(len(ANIMALS)), len(templates))
 
+    acts = {}
+
     def recall(removed):
         out = []
         for seq, pos, mask in templates:
@@ -65,6 +69,9 @@ def main():
 
                 def lin(k, h):
                     y = h @ model.site(n(k)).W.T
+                    if not removed and n(k) in UV:
+                        for cls, p in pos.items():
+                            acts[(n(k), cls)] = acts.get((n(k), cls), 0) + (h[:, p] @ UV[n(k)][1]).abs().mean((0, 1)) / len(templates)
                     for idx, p in rem.get(n(k), []):
                         U, V = UV[n(k)]
                         y[:, p] -= (h[:, p] @ V[:, idx])[..., None] * U[idx]
@@ -79,27 +86,35 @@ def main():
                 z = z + lin("down_proj", vm.gelu_tanh(lin("c_fc", hh)))
             logits = vm.rms(z, model.ln_f, model.eps)[:, -1] @ model.wte.T
             out.append(torch.log_softmax(logits, -1)[:, animal_ids].numpy())
-        return float(accuracy(np.concatenate(out), chosen))
+        return template_measures(np.concatenate(out), chosen)
 
     chain = json.load(open(a.chain))
-    links = [("copy value at the word", "h.2.attn.v_proj", "word", [r["idx"] for r in chain["3.5"]["copy"]["v_proj"]]),
-             ("copy output at the later tokens", "h.2.attn.o_proj", "later", [r["idx"] for r in chain["3.5"]["copy"]["o_proj"]]),
-             ("read value at the later tokens", "h.3.attn.v_proj", "later",
-              [r["idx"] for r in chain["3.5"]["read"]["v_proj"]] + [r["idx"] for r in chain["3.4"]["read"]["v_proj"]]),
-             ("read output at the cue", "h.3.attn.o_proj", "cue",
-              [r["idx"] for r in chain["3.5"]["read"]["o_proj"]] + [r["idx"] for r in chain["3.4"]["read"]["o_proj"]])]
+
+    def ranked_over_heads(step, kind):
+        best = {}
+        for head in ("3.4", "3.5"):
+            for r in chain[head][step][kind]:
+                best[r["idx"]] = max(best.get(r["idx"], -np.inf), r["gain_lost"])
+        return sorted(best, key=lambda i: -best[i]), best
+
+    links = [("copy value at the word", "h.2.attn.v_proj", "word", "copy", "v_proj"),
+             ("copy output at the later tokens", "h.2.attn.o_proj", "later", "copy", "o_proj"),
+             ("read value at the later tokens", "h.3.attn.v_proj", "later", "read", "v_proj"),
+             ("read output at the cue", "h.3.attn.o_proj", "cue", "read", "o_proj")]
     base = recall([])
-    out = {"recall": base, "links": {}}
-    print(f"unedited recall {100 * base:.1f}%", flush=True)
-    for name, site, cls, ranked in links:
-        ranked = list(dict.fromkeys(ranked))
+    out = {"unedited": base, "links": {}}
+    print(f"unedited raise {base['raise']:.4f}", flush=True)
+    for name, site, cls, step, kind in links:
+        ranked, gain = ranked_over_heads(step, kind)
+        active = [int(i) for i in acts[(site, cls)].argsort(descending=True)[:100].tolist() if int(i) not in ranked]
         r = {}
         for k in [int(x) for x in a.ks.split(",")]:
             top = recall([(site, i, cls) for i in ranked[:k]])
-            rand = [recall([(site, int(i), cls) for i in rng.choice(len(UV[site][0]), k, replace=False)]) for _ in range(3)]
-            r[k] = {"top": top, "random": rand}
-            print(f"  {name}: top {k} removed {100 * top:.1f}%, random {k}: " + ", ".join(f"{100 * x:.1f}%" for x in rand), flush=True)
-        out["links"][name] = {"site": site, "position": cls, "ranked": ranked, "by_k": r}
+            rand = [recall([(site, int(i), cls) for i in rng.choice(active, k, replace=False)]) for _ in range(3)]
+            r[k] = {"top": top, "random": rand, "removed": ranked[:k]}
+            print(f"  {name}: top {min(k, len(ranked))} removed: raise {top['raise']:.4f} ({top['raise'] / base['raise'] - 1:+.0%}); "
+                  f"random {k} active: " + ", ".join(f"{x['raise'] / base['raise'] - 1:+.0%}" for x in rand), flush=True)
+        out["links"][name] = {"site": site, "position": cls, "ranked": ranked, "gain_lost": [gain[i] for i in ranked], "by_k": r}
         json.dump(out, open(a.out, "w"), indent=1)
 
 

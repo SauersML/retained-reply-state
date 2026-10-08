@@ -14,6 +14,7 @@ import json
 import os
 import sys
 
+import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,7 +26,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--copy", default="2.3")
     ap.add_argument("--read", default="3.4,3.5")
-    ap.add_argument("--top", type=int, default=8)
+    ap.add_argument("--top", type=int, default=0, help="keep this many per list (0 = all)")
     ap.add_argument("--out", default=os.path.join(RESULTS, "head_subcomponents.json"))
     a = ap.parse_args()
     torch.set_grad_enabled(False)
@@ -74,11 +75,17 @@ def main():
                 share = (side.view(len(side), H, D) ** 2).sum(-1)[:, h] / (side ** 2).sum(-1)
                 mine = torch.nonzero(share > 0.5).flatten()
                 strength = act[(site, cls)][mine] * (side[mine].norm(dim=-1))
-                order = mine[strength.argsort(descending=True)][:a.top]
+                order = mine[strength.argsort(descending=True)]
+                order = order[:a.top] if a.top else order
                 out[head][kind] = [{"idx": int(i), "share": float(share[i]), "activity": float(act[(site, cls)][i]),
                                     "strength": float(act[(site, cls)][i] * side[i].norm())} for i in order]
-                print(f"head {head} ({step}) {kind} at {cls}: {len(mine)} subcomponents in the head; strongest "
-                      + ", ".join(f"#{r['idx']} ({r['strength']:.2f})" for r in out[head][kind][:5]), flush=True)
+                st = np.sort(strength.numpy())[::-1]
+                cum = np.cumsum(st) / max(st.sum(), 1e-12)
+                need = {f: int(np.searchsorted(cum, f) + 1) if len(st) else 0 for f in (0.5, 0.9)}
+                out[head][kind + "_count"] = {"in_head": int(len(mine)), "for_half_the_strength": need[0.5],
+                                              "for_90pct_of_the_strength": need[0.9]}
+                print(f"head {head} ({step}) {kind} at {cls}: {len(mine)} subcomponents in the head ({need[0.5]} carry half the "
+                      f"strength, {need[0.9]} carry 90%); strongest " + ", ".join(f"#{r['idx']} ({r['strength']:.2f})" for r in out[head][kind][:5]), flush=True)
     json.dump(out, open(a.out, "w"), indent=1)
 
 

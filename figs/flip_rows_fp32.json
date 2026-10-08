@@ -1,0 +1,16 @@
+[
+ {"group": "the same test on other data", "rows": [
+  {"label": "held-out runs", "path": "results/fp32/q17A_heldout.json", "spec": "21:6*0"},
+  {"label": "runs the head was found on", "path": "results/fp32/q17A_discovery.json", "spec": "21:6*0"},
+  {"label": "countries instead of animals", "path": "results/fp32/q17A_countries.json", "spec": "21:6*0"},
+  {"label": "turn 1 without “Do not reveal it.”", "path": "results/fp32/q17A_noreveal.json", "spec": "21:6*0"},
+  {"label": "both turns worded differently", "path": "results/fp32/q17B_wordingB.json", "spec": "21:6*0"},
+  {"label": "Qwen3-0.6B, same head", "path": "results/fp32/q06A.json", "spec": "21:6*0"}]},
+ {"group": "control: other heads switched off", "control": true, "rows": [
+  {"label": "head 21.5", "path": "results/fp32/q17A_controls.json", "spec": "21:5*0"},
+  {"label": "heads 21.1 and 21.2", "path": "results/fp32/q17A_controls.json", "spec": "21:1*0,21:2*0"},
+  {"label": "heads 21.3 and 21.4", "path": "results/fp32/q17A_controls.json", "spec": "21:3*0,21:4*0"},
+  {"label": "heads 20.5 and 20.6", "path": "results/fp32/q17A_controls.json", "spec": "20:5*0,20:6*0"},
+  {"label": "heads 22.5 and 22.6", "path": "results/fp32/q17A_controls.json", "spec": "22:5*0,22:6*0"},
+  {"label": "head 26.4", "path": "results/fp32/q17A_controls.json", "spec": "26:4*0"}]}
+]

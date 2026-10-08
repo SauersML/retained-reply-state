@@ -25,6 +25,7 @@ sys.path.insert(0, os.environ.get("VPD_MODEL_DIR", os.path.expanduser("~/gam/ben
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import vpd_model as vm
 from stats import animal_level, raises
+from discrimination import accuracy
 from tokenizers import Tokenizer
 
 ANIMALS = ["dog", "cat", "horse", "cow", "pig", "sheep", "goat", "lion", "tiger", "bear", "wolf", "fox", "deer",
@@ -48,6 +49,20 @@ def _sdpa(q, k, v, is_causal=False, **kw):
     return F.scaled_dot_product_attention(q, k, v, is_causal=is_causal, **kw)
 _shim.scaled_dot_product_attention = _sdpa
 vm.F = _shim
+
+
+def template_measures(L, chosen, per=50):
+    """Recall measures for runs that come as templates of `per` runs (every word once as X), in order.  Each word's log P
+    is taken relative to its mean over the runs of the same template, which removes how much each template favors each
+    word (the between-template spread of a word's log P, about 1.9 nats, is seven times the hidden word's raise).
+      raise           the hidden word's log P minus its mean in the template, averaged over runs (nats; 0 = no recall)
+      discrimination  share of other words the hidden word is ranked above, within the template (50% = chance)
+      top1            share of runs whose hidden word has the highest log P of the 50 (2% = chance)
+      pooled          discrimination with each word centered over all templates pooled (the earlier, noisier measure)"""
+    groups = np.arange(len(chosen)) // per
+    assert (chosen == np.tile(np.arange(per), len(chosen) // per)).all(), "runs are not templates x words in order"
+    return {"raise": float(raises(L, chosen, groups).mean()), "discrimination": float(accuracy(L, chosen, groups=groups)),
+            "top1": float(np.mean(L.argmax(1) == chosen)), "pooled": float(accuracy(L, chosen))}
 
 
 def masks(T, x, mid_end, device):

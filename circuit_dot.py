@@ -43,16 +43,23 @@ def render(dot, path, dpi=220, snap=()):
 
 
 def width(d):
-    return f"{1.6 + 0.9 * abs(d):.2f}"
+    """Wire width from the change in the hidden word's raise (percent of the unedited raise) when the part is removed."""
+    return f"{1.6 + min(6.0, 0.09 * abs(d)):.2f}"
+
+
+DRAWN = ["h.2.attn.k_proj#224@word", "h.2.attn.k_proj#206@word", "h.2.attn.q_proj#436@later", "h.3.attn.k_proj#145@later",
+         "h.3.attn.k_proj#507@later", "h.3.attn.q_proj#182@cue", "h.3.attn.q_proj#334@cue", "h.3.attn.q_proj#60@cue"]
 
 
 def gates_dot(g):
-    """Parts named by layer, matrix and position; wire width grows with the recall change when the part is removed.
+    """Parts named by layer, matrix and position: every query or key subcomponent whose removal moves the hidden word's
+    raise (its log P relative to its mean within the template) by at least 10% (fourlayer/attention_gates.py); a part
+    of two subcomponents takes the larger effect.  Wire width grows with that change.
     Returns the dot source and the bundles' (label node, tail, head) for render(snap=...)."""
-    base = 100 * g["recall"]
-    eff = {k: 100 * v["recall"] - base for k, v in g["gates"].items()}
-    eff.update({k: -100 * v for k, v in g.get("screen", {}).items()})
-    E = lambda *keys: sum(eff.get(k, 0.0) for k in keys) / max(1, sum(k in eff for k in keys))
+    eff = {k: 100 * v["raise_change_share"] for k, v in g["gates"].items()}
+    missing = [k for k in DRAWN if k not in eff]
+    assert not missing, f"no measurement for {missing}"
+    E = lambda *keys: max((eff[k] for k in keys), key=abs)
     need = lambda d: f'color="{BLUE}", penwidth={width(d)}, arrowhead=normal, arrowsize=1.1'
     block = lambda d: f'color="{CORAL}", penwidth={width(d)}, arrowhead=tee, arrowsize=1.4'
     info = f'color="{CLOUD}", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9'
@@ -79,7 +86,7 @@ def gates_dot(g):
   {{ rank=same; k2 [label="layer 2 keys\nat the hidden word\n(2 subcomponents)", color="{BLUE}", fontcolor="{BLUE}", {part}];
     q2 [label="layer 2 query\nat the later tokens", color="{BLUE}", fontcolor="{BLUE}", {part}]; }}
   h2 [label="layer 2, head 3\ncopies the word\ninto the later tokens", {head}];
-  {{ rank=same; k3 [label="layer 3 key\nat the later tokens", color="{BLUE}", fontcolor="{BLUE}", {part}];
+  {{ rank=same; k3 [label="layer 3 keys\nat the later tokens\n(2 subcomponents)", color="{BLUE}", fontcolor="{BLUE}", {part}];
     q3 [label="layer 3 query\nwhere the word\nis recalled", color="{BLUE}", fontcolor="{BLUE}", {part}];
     b3 [label="layer 3 queries\nwhere the word\nis recalled\n(2 subcomponents)", color="{CORAL}", fontcolor="{CORAL}", {part}]; }}
   h3 [label="layer 3, heads 4 and 5\nread the later tokens\nwhere the word is recalled", {head}];
@@ -89,7 +96,7 @@ def gates_dot(g):
   k2 -> h2 [{need(E("h.2.attn.k_proj#224@word", "h.2.attn.k_proj#206@word"))}];
   q2 -> h2 [{need(E("h.2.attn.q_proj#436@later"))}];
 {bundle("h2", "h3", "the copied word:\\nmany output and\\nvalue subcomponents")}
-  k3 -> h3 [{need(E("h.3.attn.k_proj#145@later"))}];
+  k3 -> h3 [{need(E("h.3.attn.k_proj#145@later", "h.3.attn.k_proj#507@later"))}];
   q3 -> h3 [{need(E("h.3.attn.q_proj#182@cue"))}];
   b3 -> h3 [{block(E("h.3.attn.q_proj#334@cue", "h.3.attn.q_proj#60@cue"))}];
 {bundle("h3", "answer", "many output\\nsubcomponents")}

@@ -6,7 +6,9 @@ and each after Janus's LLM explainer and after a CPU explainer of the same lengt
 held-out runs; countries, turn 1 without "Do not reveal it.", and both turns in wording B, with head 21.6 switched off.
 Group "other": Qwen3-0.6B (same questions, head 21.6 switched off), Qwen3-4B and Qwen3-8B (two sets each, unedited).
 DOCS holds explainer.txt (Janus's LLM explainer) and cpu_explainer.txt (documents/cpu_explainer.txt).
-usage: fp32_runs.py GROUP WINDOWS.u32 DOCS --device cuda
+--only runs the named jobs of any group; --sync HOST:DIR copies each finished output (and its .done marker) there, so a
+second machine sharing the work skips it.
+usage: fp32_runs.py GROUP WINDOWS.u32 DOCS --device cuda [--only NAME,...] [--sync HOST:DIR]
 """
 import argparse
 import os
@@ -20,11 +22,13 @@ CONTROLS = "21:5*0;21:1*0,21:2*0;21:3*0,21:4*0;20:5*0,20:6*0;22:5*0,22:6*0;26:4*
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("group", choices=["1.7b", "other"])
+    ap.add_argument("group", choices=["1.7b", "other", "all"])
     ap.add_argument("windows")
     ap.add_argument("docs")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--only", default="")
+    ap.add_argument("--sync", default="")
     a = ap.parse_args()
     A, B, N = task("A")["recall"], task("B")["recall"], task("A")["neutral"]
     doc = open(os.path.join(a.docs, "explainer.txt")).read().strip()
@@ -32,7 +36,7 @@ def main():
     questions = {"recall_B": B, "doc_A": doc + "\n\n" + A, "doc_B": doc + "\n\n" + B, "doc_neutral": doc + "\n\n" + N,
                  "cpu_A": cpu + "\n\n" + A, "cpu_B": cpu + "\n\n" + B, "cpu_neutral": cpu + "\n\n" + N}
     qargs = [x for k, v in questions.items() for x in ("--question", f"{k}={v}")]
-    jobs = {
+    groups = {
         "1.7b": [
             ("results/q17A/q17A_confirmation.json", ["--arms", "retained,neutral", "--edits", "21:6*0", "--save-logp"] + qargs, "q17A_heldout"),
             ("results/qwen3_1.7b.json", ["--arms", "retained,neutral", "--edits", "21:6*0", "--save-logp"] + qargs, "q17A_discovery"),
@@ -49,7 +53,10 @@ def main():
             ("results/qwen3_8b.json", ["--arms", "retained", "--save-logp"], "q8A_set1"),
             ("results/q8A/q8A_confirmation.json", ["--arms", "retained", "--save-logp"], "q8A_set2"),
         ],
-    }[a.group]
+    }
+    jobs = groups["1.7b"] + groups["other"] if a.group == "all" else groups[a.group]
+    if a.only:
+        jobs = [j for j in jobs if j[2] in a.only.split(",")]
     os.makedirs("results/fp32", exist_ok=True)
     for result, extra, name in jobs:
         out = f"results/fp32/{name}.json"
@@ -61,6 +68,9 @@ def main():
         if subprocess.call(cmd) != 0:
             sys.exit(f"{name} failed")
         open(out.replace(".json", ".done"), "w").close()
+        if a.sync:
+            subprocess.call(["rsync", "-a", out, out.replace(".json", ".done")] +
+                            ([out.replace(".json", ".npz")] if os.path.exists(out.replace(".json", ".npz")) else []) + [a.sync])
 
 
 if __name__ == "__main__":
