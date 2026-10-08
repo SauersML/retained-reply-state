@@ -1,6 +1,6 @@
 """Further figures from the saved float32 results (figs/*.png), each self-contained.
 
-documents_head   Qwen3-1.7B, held-out runs: for each question, the hidden animal's rank (share of other animals it is ranked
+documents_head   Qwen3-1.7B (held-out runs) and Qwen3-0.6B: for each question, the hidden animal's rank (share of other animals it is ranked
                  above, 50% = chance) with the question alone, after a CPU explainer and after Janus's LLM explainer, with
                  head 21.6 on and switched off.  Points: mean over hidden animals, bars: 95% interval from resampling hidden
                  animals; p: sign flips of each run's paired change in the hidden animal's centered log P.
@@ -38,39 +38,46 @@ def p_text(p):
 
 
 def documents_head(out="figs/documents_head.png"):
+    """Rows: Qwen3-1.7B (held-out runs) and Qwen3-0.6B; columns: the three questions.  Lines: head 21.6 working (blue)
+    and switched off (gray)."""
     rng = np.random.default_rng(0)
-    qs = [("retained", "cpu_A", "doc_A", "“Which animal did you choose?”"),
-          ("recall_B", "cpu_B", "doc_B", "“Recall, introspect, or reconstruct…”"),
-          ("neutral", "cpu_neutral", "doc_neutral", "control: “Name one animal…”")]
-    fig, axes = plt.subplots(1, 3, figsize=(20, 7.4), sharey=True)
-    fig.subplots_adjust(left=0.07, right=0.84, bottom=0.17, top=0.8, wspace=0.12)
-    for ax, (q0, qc, qd, title) in zip(axes, qs):
-        for edit, col, name in (("none", BLUE, "head 21.6 working"), ("21:6*0", SLATE, "head 21.6 switched off")):
-            Ls = [saved_logp(HELD, f"{edit}|{q}") for q in (q0, qc, qd)]
-            c = Ls[0][1]
-            m = [mean_ci(L, c, rng) for L, _ in Ls]
-            xs = np.arange(3)
-            ax.plot(xs, [v[0] for v in m], "-", color=col, lw=3.2, zorder=2)
-            for x, (mu, lo, hi) in zip(xs, m):
-                ax.plot([x, x], [lo, hi], color=col, lw=2.2, zorder=2)
-                ax.scatter([x], [mu], s=170, color=col, edgecolor="white", lw=1.5, zorder=3)
-            g = [centred_logp(L, c) for L, _ in Ls]
-            for k, x in enumerate((1, 2)):                   # gray labels above the gray points, blue below the blue
-                p = p_paired(g[k + 1] - g[0], rng)
-                up = edit != "none"
-                ax.text(x if up else x + 0.07, (m[k + 1][2] + 0.6) if up else (m[k + 1][1] - 0.6), p_text(p), fontsize=15,
-                        ha="center" if up else "left", color=col if p < 0.05 else CLOUD, va="bottom" if up else "top")
-        ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
-        ax.set_xticks(range(3), ["question\nalone", "CPU\nexplainer\nfirst", "Janus's\nexplainer\nfirst"], fontsize=17)
-        ax.set_xlim(-0.35, 2.6)
-        ax.set_title(title, fontsize=19, pad=14)
-        ax.tick_params(axis="x", length=0)
-    axes[0].set_ylabel("hidden animal ranked above\nanother animal (%)", fontsize=20)
-    axes[0].set_ylim(33, 82)
-    axes[-1].text(2.7, 72, "head 21.6 switched off", color=SLATE, fontsize=19, va="center")
-    axes[-1].text(2.7, 57, "head 21.6 working", color=BLUE, fontsize=19, va="center")
-    fig.text(0.07, 0.94, "Qwen3-1.7B: a document before the question raises recall mainly by easing head 21.6's suppression",
-             fontsize=24, weight="bold")
+    rows = [("Qwen3-1.7B", HELD, "recall_B", (33, 82)), ("Qwen3-0.6B", "results/fp32/q06A_allq.npz", "preB_askB", (8, 68))]
+    fig, axes = plt.subplots(2, 3, figsize=(20, 13.5))
+    fig.subplots_adjust(left=0.1, right=0.84, bottom=0.1, top=0.86, wspace=0.12, hspace=0.42)
+    for (model, spec, qb, ylim), row in zip(rows, axes):
+        qs = [("retained", "cpu_A", "doc_A", "\u201cWhich animal did you choose?\u201d"),
+              (qb, "cpu_B", "doc_B", "\u201cRecall, introspect, or reconstruct\u2026\u201d"),
+              ("neutral", "cpu_neutral", "doc_neutral", "control: \u201cName one animal\u2026\u201d")]
+        for ax, (q0, qc, qd, title) in zip(row, qs):
+            for edit, col in (("none", BLUE), ("21:6*0", SLATE)):
+                Ls = [saved_logp(spec, f"{edit}|{q}") for q in (q0, qc, qd)]
+                c = Ls[0][1]
+                m = [mean_ci(L, c, rng) for L, _ in Ls]
+                ax.plot(range(3), [v[0] for v in m], "-", color=col, lw=3.2, zorder=2)
+                for x, (mu, lo, hi) in enumerate(m):
+                    ax.plot([x, x], [lo, hi], color=col, lw=2.2, zorder=2)
+                    ax.scatter([x], [mu], s=170, color=col, edgecolor="white", lw=1.5, zorder=3)
+                g = [centred_logp(L, c) for L, _ in Ls]
+                up = edit != "none"                 # the gray line lies above the blue one in every panel: labels outside
+                for k, x in enumerate((1, 2)):
+                    p = p_paired(g[k + 1] - g[0], rng)
+                    ax.text(x if up else x + 0.07, (m[k + 1][2] + 0.6) if up else (m[k + 1][1] - 0.6), p_text(p), fontsize=14,
+                            ha="center" if up else "left", color=col if p < 0.05 else CLOUD, va="bottom" if up else "top",
+                            bbox=dict(facecolor="white", edgecolor="none", pad=0.6), zorder=4)
+            ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
+            ax.set_xticks(range(3), ["question\nalone", "CPU\nexplainer\nfirst", "Janus's\nexplainer\nfirst"], fontsize=16)
+            ax.set_xlim(-0.35, 2.6)
+            ax.set_ylim(*ylim)
+            ax.set_title(title, fontsize=18, pad=12)
+            ax.tick_params(axis="x", length=0)
+            if ax is not row[0]:
+                ax.set_yticklabels([])
+        row[0].set_ylabel(f"{model}\n\nhidden animal ranked above\nanother animal (%)", fontsize=19)
+    axes[0, -1].text(2.75, 72, "head 21.6 switched off", color=SLATE, fontsize=18, va="center")
+    axes[0, -1].text(2.75, 57, "head 21.6 working", color=BLUE, fontsize=18, va="center")
+    fig.text(0.1, 0.94, "a document before the question acts partly through head 21.6: in Qwen3-1.7B it eases the head's\n"
+             "suppression of the hidden animal; in Qwen3-0.6B it strengthens it (switching the head off halves the drop)",
+             fontsize=21, weight="bold", va="center")
     fig.savefig(out, dpi=110, facecolor="white")
 
 
