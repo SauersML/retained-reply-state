@@ -412,7 +412,7 @@ def paired_legend(cv, x, y, left, right):
 
 EXPLAINER_EXTRA = [("results/fp32/expl_17_wordingB.npz", "B", "1.7B, both\nturns reworded:\n\u201cRecall\u2026\u201d"),
                    ("results/fp32/expl_4b.npz", "A", "4B:\n\u201cWhich\nanimal\u2026?\u201d"),
-                   ("results/fp32/expl_8b.npz", "A", "8B:\n\u201cWhich\nanimal\u2026?\u201d")]
+                   ("results/fp32/expl_8b.npz+results/fp32/expl_8b_set2.npz", "A", "8B:\n\u201cWhich\nanimal\u2026?\u201d")]
 
 
 def explainer_questions(npz, other):
@@ -424,7 +424,7 @@ def explainer_questions(npz, other):
           (npz, npz, "retained", "cpu_A", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"),
           (npz, npz, "recall_B", "cpu_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
           (npz, npz, "neutral", "cpu_neutral", "doc_neutral", "1.7B control:\n\u201cName one\nanimal\u2026\u201d")]
-    qs += [(sp, sp, "retained", f"cpu_{w}", f"doc_{w}", lab) for sp, w, lab in EXPLAINER_EXTRA if os.path.exists(sp)]
+    qs += [(sp, sp, "retained", f"cpu_{w}", f"doc_{w}", lab) for sp, w, lab in EXPLAINER_EXTRA if os.path.exists(sp.split("+")[0])]
     return [q for q in qs if saved_logp(q[0], f"none|{q[4]}")[0] is not None]
 
 
@@ -498,7 +498,12 @@ def row_controls(cv, y0, npz, other):
     qs = explainer_questions(npz, other)
     labels = [lab for *_, lab in qs]
     cv.letter(0.1, top - 0.75, "f")
-    flat = [m for m, f in (("4B", "results/fp32/expl_4b.npz"), ("8B", "results/fp32/expl_8b.npz")) if os.path.exists(f)]
+    def no_change(spec):
+        """True when Janus's explainer leaves the recall question unchanged (paired test, p >= 0.05)."""
+        (L0, c), (L1, _) = saved_logp(spec, "none|retained"), saved_logp(spec, "none|doc_A")
+        return p_paired(centred_logp(L1, c) - centred_logp(L0, c), np.random.default_rng(0)) >= 0.05
+    flat = [m for m, f in (("4B", "results/fp32/expl_4b.npz"), ("8B", "results/fp32/expl_8b.npz+results/fp32/expl_8b_set2.npz"))
+            if os.path.exists(f.split("+")[0]) and no_change(f)]
     cv.S.text(0.9, top - 0.75, "Janus's LLM explainer before the question: up in Qwen3-1.7B\nwith the plain question, down in Qwen3-0.6B"
               + (f", no change in {' or '.join(flat)}" if flat else ""), fontsize=25, weight="bold", va="center", linespacing=1.15)
     for x, col, lab in ((1.1, SLATE, "question alone"), (4.3, BLUE, "Janus's LLM explainer first")):
