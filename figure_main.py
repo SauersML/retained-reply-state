@@ -455,7 +455,7 @@ def row_head(cv, y0, flip_groups, npz, other):
     edited = all(saved_logp(held, f"21:6*0|{q}")[0] is not None for q in ("retained", "recall_B", "neutral"))
     qs = [("retained", "\u201cWhich\nanimal did\nyou choose?\u201d"), ("recall_B", "\u201cRecall,\nintrospect, or\nreconstruct\u2026\u201d"),
           ("neutral", "control:\n\u201cName one\nanimal\u2026\u201d")]
-    ax = cv.axes(12.9, y0 + 2.6, 5.6, 5.9)
+    ax = cv.axes(12.9, y0 + 1.1, 5.6, 6.9)                # same vertical extent as panel c
     panel_paired(ax, [(saved_logp(held, f"none|{q}")[0], saved_logp(held, f"21:6*0|{q}")[0] if edited else None,
                        saved_logp(held, f"none|{q}")[1]) for q, _ in qs], (15, 102))
     ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for _, lab in qs], fontsize=18)
@@ -472,14 +472,14 @@ def row_head(cv, y0, flip_groups, npz, other):
         cv.S.text(20.25, yy, lab, fontsize=17, color=col, va="center")
     held = npz.split("+")[0]
     groups = [(npz, "none", "Qwen3-1.7B"), (other, "none", "Qwen3-0.6B"), (held, "21:6*0", "Qwen3-1.7B,\nhead 21.6\nswitched off")]
-    ax = cv.axes(20.9, y0 + 2.6, 5.75, ROWS[1] - 5.6)
+    ax = cv.axes(20.9, y0 + 1.1, 5.75, 6.9)
     panel_paired(ax, [(saved_logp(sp, f"{e}|retained")[0], saved_logp(sp, f"{e}|recall_B")[0], saved_logp(sp, f"{e}|retained")[1])
                       for sp, e, _ in groups], (5, 102))
     ax.set_xticks([3 * k + 0.6 for k in range(len(groups))], [lab for *_, lab in groups], fontsize=18)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
-    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, ROWS[1] - 5.6))
+    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 1.1, 0.2, 6.9))
     cb.set_ticks([-1, 0, 1], labels=["½×", "1×", "2×"])
     cb.set_label("change per line (d-g)", fontsize=16, labelpad=2)
     cb.ax.tick_params(labelsize=17)
