@@ -103,5 +103,84 @@ def flow(out="figs/flow4l.png"):
     fig.savefig(out, dpi=110, facecolor="white")
 
 
+WORDING = [("preA_askA", "\u201cWhich animal did you choose?\u201d"),
+           ("preA_introspect_which", "\u201cIntrospect: which animal did you choose?\u201d"),
+           ("preA_recall", "\u201cRecall which animal you chose\u201d"),
+           ("preA_introspect", "\u201cIntrospect which animal you chose\u201d"),
+           ("preA_reconstruct", "\u201cReconstruct which animal you chose\u201d"),
+           ("preA_askB", "\u201cRecall, introspect, or reconstruct\u2026\u201d"),
+           ("preB_askA", "introspective preamble + \u201cWhich animal\u2026?\u201d"),
+           ("preB_askB", "introspective preamble + \u201cRecall, introspect,\nor reconstruct\u2026\u201d")]
+ATT_SOURCES = {"A": (HELD, "retained"), "B": (HELD, "recall_B"), "neutral": (HELD, "neutral"), "doc_A": (HELD, "doc_A"),
+               "cpu_A": (HELD, "cpu_A"), "doc_B": (HELD, "doc_B"), "cpu_B": (HELD, "cpu_B"), "doc_neutral": (HELD, "doc_neutral"),
+               "cpu_neutral": (HELD, "cpu_neutral")}
+
+
+def wording(out="figs/wording.png", word="results/fp32/wording_heldout_mac.npz", att="results/fp32/attention_all.npz"):
+    """Left: recall for each wording, head 21.6 working and switched off (held-out runs; p: paired against the plain
+    question).  Right: per question, head 21.6's attention from the answer position to the reply against recall."""
+    rng = np.random.default_rng(0)
+    fig = plt.figure(figsize=(22, 9.6))
+    ax = fig.add_axes([0.25, 0.14, 0.33, 0.68])
+    base = {e: saved_logp(word, f"{e}|preA_askA") for e in ("none", "21:6*0")}
+    for i, (k, lab) in enumerate(WORDING):
+        y = len(WORDING) - 1 - i
+        for e, col in (("21:6*0", SLATE), ("none", BLUE)):
+            L, c = saved_logp(word, f"{e}|{k}")
+            mu, lo, hi = mean_ci(L, c, rng)
+            ax.plot([lo, hi], [y, y], color=col, lw=2.2)
+            ax.scatter([mu], [y], s=150, color=col, edgecolor="white", lw=1.4, zorder=3)
+            if e == "none" and k != "preA_askA":
+                pv = p_paired(centred_logp(L, c) - centred_logp(base[e][0], c), rng)
+                ax.text(hi + 0.6, y, p_text(pv), fontsize=15, va="center", color=BLUE if pv < 0.05 else CLOUD)
+    ax.set_yticks(range(len(WORDING)), [lab for _, lab in WORDING][::-1], fontsize=16)
+    ax.axvline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)))
+    ax.set_xlim(35, 80)
+    ax.set_xlabel("hidden animal ranked above another animal (%)", fontsize=19)
+    ax.tick_params(axis="y", length=0)
+    ax.spines["left"].set_visible(False)
+    ax.text(36, len(WORDING) - 0.35, "head 21.6 working", color=BLUE, fontsize=18)
+    ax.text(64, len(WORDING) - 0.35, "switched off", color=SLATE, fontsize=18)
+    fig.text(0.01, 0.93, "a", fontsize=36, weight="bold")
+    fig.text(0.03, 0.93, "every edit of the plain question raises recall; none\nmatters with head 21.6 switched off",
+             fontsize=21, weight="bold", va="center")
+
+    ax = fig.add_axes([0.68, 0.14, 0.3, 0.68])
+    z = np.load(att)
+    g = int(z["group"])
+    pts = []
+    labels = {"A": "\u201cWhich animal\u2026?\u201d", "B": "introspective\nquestion", "neutral": "\u201cName one\nanimal\u2026\u201d",
+              "doc_A": "Janus's explainer\n+ \u201cWhich animal\u2026?\u201d", "cpu_A": "CPU explainer\n+ \u201cWhich animal\u2026?\u201d"}
+    for k, (src, arm) in list(ATT_SOURCES.items()) + [(k, (word, f"{k}")) for k, _ in WORDING if k not in ("preA_askA", "preB_askB")]:
+        L, c = saved_logp(src, f"none|{arm}")
+        a = 100 * z[k][:, 0, 6 * g:7 * g].mean()
+        r = per_animal(L, c).mean()
+        col = GOLD if k.startswith("cpu") else (CORAL if k.startswith("doc") else BLUE)
+        ax.scatter([a], [r], s=170, color=col, edgecolor="white", lw=1.4, zorder=3)
+        pts.append((a, r))
+        if k in labels:
+            dx, dy, ha, va = {"A": (-0.15, 0, "right", "center"), "B": (0.12, -0.5, "left", "top"),
+                              "neutral": (0.12, 0.5, "left", "bottom"), "doc_A": (0.12, 0.6, "left", "bottom"),
+                              "cpu_A": (0.14, 0, "left", "center")}[k]
+            if k in ("doc_A", "cpu_A"):                       # crowded corner: text set apart with a leader line
+                tx, ty = {"doc_A": (1.4, 61.2), "cpu_A": (1.4, 64.2)}[k]
+                ax.annotate(labels[k], xy=(a, r), xytext=(tx, ty), fontsize=14, color=INK, ha="left", va="center",
+                            linespacing=1.0, arrowprops=dict(arrowstyle="-", color=CLOUD, lw=1.2, shrinkA=2, shrinkB=6))
+            else:
+                ax.text(a + dx, r + dy, labels[k], fontsize=14, color=INK, ha=ha, va=va, linespacing=1.0)
+    xs, ys = np.array(pts).T
+    rho = np.corrcoef(xs, ys)[0, 1]
+    ax.set_xlabel("head 21.6's attention to the reply\n(% of the answer position's attention)", fontsize=19)
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)", fontsize=19)
+    ax.axhline(50, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=0)
+    for t, col, yy in (("question wordings", BLUE, 0.16), ("Janus's explainer first", CORAL, 0.1), ("CPU explainer first", GOLD, 0.04)):
+        ax.text(0.98, yy + 0.8, t, transform=ax.transAxes, ha="right", color=col, fontsize=16)
+    fig.text(0.62, 0.93, "b", fontsize=36, weight="bold")
+    fig.text(0.64, 0.93, f"the less head 21.6 reads the reply, the higher\nrecall (15 questions, correlation {rho:.2f})",
+             fontsize=21, weight="bold", va="center")
+    fig.text(0.03, 0.995, "Qwen3-1.7B, held-out runs", fontsize=16, color=SLATE, va="top")
+    fig.savefig(out, dpi=110, facecolor="white")
+
+
 if __name__ == "__main__":
-    {"documents_head": documents_head, "flow": flow}[sys.argv[1]]()
+    {"documents_head": documents_head, "flow": flow, "wording": wording}[sys.argv[1]]()

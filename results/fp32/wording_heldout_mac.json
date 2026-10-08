@@ -1,0 +1,164 @@
+{
+ "model": "Qwen/Qwen3-1.7B",
+ "result": "results/q17A/q17A_confirmation.json",
+ "runs": 599,
+ "dtype": "float32",
+ "turn1_drop": null,
+ "recall": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Which animal did you choose? Answer in exactly this format: Animal: <animal>",
+ "neutral": "Name one animal from the list above, whichever you like. Answer in exactly this format: Animal: <animal>",
+ "questions": {
+  "preA_askA": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Which animal did you choose? Answer in exactly this format: Animal: <animal>",
+  "preB_askB": "In the preceding turn of this conversation, during your internal thinking, you chose one animal from the list. That thinking is not shown to you now. Recall, introspect, or reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
+  "preB_askA": "In the preceding turn of this conversation, during your internal thinking, you chose one animal from the list. That thinking is not shown to you now. Which animal did you choose? Answer in exactly this format: Animal: <animal>",
+  "preA_askB": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Recall, introspect, or reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
+  "preA_recall": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Recall which animal you chose, and answer in exactly this format: Animal: <animal>",
+  "preA_introspect": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Introspect which animal you chose, and answer in exactly this format: Animal: <animal>",
+  "preA_reconstruct": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
+  "preA_introspect_which": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Introspect: which animal did you choose? Answer in exactly this format: Animal: <animal>"
+ },
+ "windows": "/Users/user/mpd-data/qwen3_fineweb/heldout/windows_T512.u32",
+ "web_windows": [
+  0,
+  2432,
+  4864,
+  7296,
+  9729,
+  12161,
+  14593,
+  17025
+ ],
+ "edits": {
+  "none": {
+   "retained": {
+    "discrimination": 0.40399852749694787,
+    "p": 0.000999000999000999,
+    "top1": 0.01669449081803005,
+    "mean_rank": 26.03839732888147,
+    "raise": -0.02636729946069361
+   },
+   "preA_askA": {
+    "discrimination": 0.40399852749694787,
+    "p": 0.000999000999000999,
+    "top1": 0.01669449081803005,
+    "mean_rank": 26.03839732888147,
+    "raise": -0.02636729946069361
+   },
+   "preB_askB": {
+    "discrimination": 0.5862727479427897,
+    "p": 0.000999000999000999,
+    "top1": 0.01335559265442404,
+    "mean_rank": 26.005008347245408,
+    "raise": 0.01637696848128364
+   },
+   "preB_askA": {
+    "discrimination": 0.512267842093109,
+    "p": 0.3626373626373626,
+    "top1": 0.01335559265442404,
+    "mean_rank": 26.15525876460768,
+    "raise": 0.00025981955429094994
+   },
+   "preA_askB": {
+    "discrimination": 0.5096519320033251,
+    "p": 0.45754245754245754,
+    "top1": 0.01335559265442404,
+    "mean_rank": 25.96661101836394,
+    "raise": 0.0023542800267384485
+   },
+   "preA_recall": {
+    "discrimination": 0.475949793435435,
+    "p": 0.10989010989010989,
+    "top1": 0.015025041736227046,
+    "mean_rank": 25.824707846410686,
+    "raise": -0.007831023842654041
+   },
+   "preA_introspect": {
+    "discrimination": 0.4833173190425197,
+    "p": 0.22777222777222778,
+    "top1": 0.015025041736227046,
+    "mean_rank": 26.040066777963272,
+    "raise": -0.007332470187502009
+   },
+   "preA_reconstruct": {
+    "discrimination": 0.5083384516994488,
+    "p": 0.5364635364635365,
+    "top1": 0.01001669449081803,
+    "mean_rank": 25.97161936560935,
+    "raise": 0.00184025254962684
+   },
+   "preA_introspect_which": {
+    "discrimination": 0.47391597874055064,
+    "p": 0.053946053946053944,
+    "top1": 0.011686143572621035,
+    "mean_rank": 26.058430717863104,
+    "raise": -0.006594186546550494
+   },
+   "web_kl": 0.0
+  },
+  "21:6*0": {
+   "retained": {
+    "discrimination": 0.6886873819983853,
+    "p": 0.000999000999000999,
+    "top1": 0.018363939899833055,
+    "mean_rank": 25.741235392320533,
+    "raise": 0.042796885934704626
+   },
+   "preA_askA": {
+    "discrimination": 0.6886873819983853,
+    "p": 0.000999000999000999,
+    "top1": 0.018363939899833055,
+    "mean_rank": 25.741235392320533,
+    "raise": 0.042796885934704626
+   },
+   "preB_askB": {
+    "discrimination": 0.7103055210148628,
+    "p": 0.000999000999000999,
+    "top1": 0.015025041736227046,
+    "mean_rank": 25.893155258764608,
+    "raise": 0.04353027615159145
+   },
+   "preB_askA": {
+    "discrimination": 0.6890871084908015,
+    "p": 0.000999000999000999,
+    "top1": 0.011686143572621035,
+    "mean_rank": 26.008347245409016,
+    "raise": 0.03822835752607972
+   },
+   "preA_askB": {
+    "discrimination": 0.7074593982150056,
+    "p": 0.000999000999000999,
+    "top1": 0.01669449081803005,
+    "mean_rank": 25.741235392320533,
+    "raise": 0.04971688515808246
+   },
+   "preA_recall": {
+    "discrimination": 0.733378143128538,
+    "p": 0.000999000999000999,
+    "top1": 0.018363939899833055,
+    "mean_rank": 25.51752921535893,
+    "raise": 0.06745465799468701
+   },
+   "preA_introspect": {
+    "discrimination": 0.6995831180553965,
+    "p": 0.000999000999000999,
+    "top1": 0.018363939899833055,
+    "mean_rank": 25.772954924874792,
+    "raise": 0.05109991800184386
+   },
+   "preA_reconstruct": {
+    "discrimination": 0.7395130025440254,
+    "p": 0.000999000999000999,
+    "top1": 0.018363939899833055,
+    "mean_rank": 25.70450751252087,
+    "raise": 0.06282625082319765
+   },
+   "preA_introspect_which": {
+    "discrimination": 0.6990114108545429,
+    "p": 0.000999000999000999,
+    "top1": 0.018363939899833055,
+    "mean_rank": 25.84974958263773,
+    "raise": 0.04115700438935219
+   },
+   "web_kl": 0.0029699457809329033
+  }
+ }
+}
