@@ -1,7 +1,7 @@
 """Circuit diagrams of Goodfire's 4-layer model laid out by Graphviz (dot), for figure_main.py.
 
 gates_dot: the recall circuit as parts and wires: the two attention steps (head 2.3 copies the word into the later
-  tokens; heads 3.4 and 3.5 read them where the word is recalled) and the VPD subcomponents measured to switch them on or off
+  tokens; heads 3.4 and 3.5 attend to them where the word is recalled) and the VPD subcomponents measured to switch them on or off
   (fourlayer/attention_gates.py, fourlayer/subcomponent_circuit.py).
 render(dot, path, snap): dot -> PNG; label nodes moved up under their wires after layout.
 """
@@ -95,10 +95,10 @@ def gates_dot(g, routes):
   {{ rank=same; k3 [label="layer 3 keys\nat the later tokens\n(2 subcomponents)", color="{BLUE}", fontcolor="{BLUE}", {part}];
     q3 [label="layer 3 query\nwhere the word\nis recalled", color="{BLUE}", fontcolor="{BLUE}", {part}];
     b3 [label="layer 3 queries\nwhere the word\nis recalled\n(2 subcomponents)", color="{CORAL}", fontcolor="{CORAL}", {part}]; }}
-  h3 [label="layer 3, heads 4 and 5\nread the later tokens\nwhere the word is recalled", {head}];
+  h3 [label="layer 3, heads 4 and 5\nwhere the word is recalled\nattend to the later tokens", {head}];
   m0 [label="layer 0 MLP at the hidden word\nwrites the word's identity\n(recall {share('0.mlp@word')} without it; spread over\nmany subcomponents, none over {100 * biggest:.0f}% alone)", {stage}];
   early [label="layers 0-1 at the later tokens:\nan earlier copy of the word\n(recall {combo('0.attn@later,0.mlp@later,1.attn@later')} without it)", {stage}];
-  read2 [label="layer 2 attention\nwhere the word is recalled:\nan earlier read\n(recall {share('2.attn@cue')} without it)", {stage}];
+  read2 [label="layer 2 attention\nwhere the word is recalled:\nbrings in the earlier copy\n(recall {share('2.attn@cue')} without it)", {stage}];
   m3 [label="layer 3 MLP\nwhere the word is recalled\nturns it into the answer\n(recall {share('3.mlp@cue')} without it)", {stage}];
   answer [label="answer:\n“fox”", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=40];
   word -> k2 [{info}]; word -> m0 [{info}]; later -> q2 [{info}]; later -> k3 [{info}]; cue -> q3 [{info}]; cue -> b3 [{info}];

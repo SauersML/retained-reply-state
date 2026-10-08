@@ -596,16 +596,20 @@ def row_schematic(cv, y0):
     text_schematic(cv, 0.6, y0 + ROWS[4])
 
 
+TEXT_CONDITIONS = [("stripped", SLATE, "no later token can\nattend to the word"),     # fourlayer/hidden_span.py masks
+                   ("retained", BLUE, "only the later tokens\ncan attend to it"),
+                   ("visible", CORAL, "every later token can\nattend to the word")]
+
+
 def text_schematic(cv, x0, top, letter="j", title="Goodfire 4-layer model: the same test in plain text", key_at=None):
     """Panel j: the three conditions of Goodfire's 4-layer model in plain text (fourlayer/hidden_span.py): attention
-    masks, in every layer, decide which later tokens may read the hidden word; arcs from the word to its readers.
+    masks, in every layer and head, decide which later tokens may attend to the hidden word; arcs from the word to the
+    tokens that may.
     key_at: (x, y, dx, dy) of the key's first entry and the step to its second (default: to the right, stacked)."""
     S, h = cv.S, 0.95
     cv.letter(x0 - 0.5, top - 0.75, letter)
     S.text(x0 + 0.3, top - 0.75, title, fontsize=25, weight="bold", va="center")
-    rows = [("stripped", SLATE, "no later token\nreads the word", False, False),
-            ("retained", BLUE, "only the later\ntokens read it", True, False),
-            ("visible", CORAL, "every later\ntoken reads it", True, True)]
+    rows = [c + ok for c, ok in zip(TEXT_CONDITIONS, ((False, False), (True, False), (True, True)))]
     xs = {"frame": (x0 + 3.7, 2.3), "word": (x0 + 6.15, 1.1), "later": (x0 + 7.4, 3.9), "cue": (x0 + 11.45, 2.3)}
 
     def arc(xa, xb, y, ok, rad):
@@ -630,11 +634,11 @@ def text_schematic(cv, x0, top, letter="j", title="Goodfire 4-layer model: the s
         arc(wx - 0.2, xs["cue"][0] + xs["cue"][1] / 2, y + h + 0.05, cue_ok, -0.33)
     kx, ky, dx, dy = key_at or (x0 + 17.2, top - 3.3 - 2.55 + h / 2 + 0.45, 0, -0.9)
     S.annotate("", xy=(kx + 1.2, ky), xytext=(kx, ky), arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=3, mutation_scale=22))
-    S.text(kx + 1.4, ky, "the token reads the word", fontsize=21, color=BLUE, va="center")
+    S.text(kx + 1.4, ky, "can attend to the word", fontsize=21, color=BLUE, va="center")
     kx, ky = kx + dx, ky + dy
     S.plot([kx, kx + 1.2], [ky, ky], color=CORAL, lw=3, ls=(0, (3, 2)))
     S.text(kx + 0.6, ky, "\u00d7", ha="center", va="center", fontsize=30, color=CORAL, weight="bold")
-    S.text(kx + 1.4, ky, "blocked by the attention mask", fontsize=21, color=CORAL, va="center")
+    S.text(kx + 1.4, ky, "attention to the word masked out in every layer", fontsize=21, color=CORAL, va="center")
 
 
 MECH_ATT, MECH_WORD = "results/fp32/attention_all.npz", "results/fp32/wording_heldout_mac.npz"

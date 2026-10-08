@@ -3,26 +3,25 @@
   b  in each condition, the raise of the hidden word's log P at recall within its template (nats), against the same with
      the hidden words re-paired at random (main figure: b's last column)
   c  the fewest VPD subcomponents that make the hidden word the top answer (main figure: i)
-  d  the recall circuit: two attention steps and the VPD subcomponents measured to switch them (main figure: k)
+  d  Claude's circuit model of recall: two attention steps and the VPD subcomponents measured to switch them (main
+     figure: k)
 usage: make_figure.sh
 """
 import argparse
 
 import matplotlib.pyplot as plt
 
-from figure_main import BLUE, CLOUD, CORAL, SLATE, Canvas, row_circuit, row_fourlayer, strip_raise, text_schematic
+from figure_main import BLUE, CLOUD, SLATE, TEXT_CONDITIONS, Canvas, row_circuit, row_fourlayer, strip_raise, text_schematic
 
 W = 20.0                                   # figure width in drawing units (inches)
 ROWS = [10.6, 9.3, 9.6, 10.0]              # heights of the four rows
 H = sum(ROWS)
-CONDITIONS = [("stripped", SLATE, "no later token\nreads the word"), ("retained", BLUE, "only the later\ntokens read it"),
-              ("visible", CORAL, "every later\ntoken reads it")]
 
 
 def row_test(cv, y0):
     """Panel a, occupying [y0, y0 + ROWS[0]], its key below the sentences."""
     top = y0 + ROWS[0]
-    text_schematic(cv, 0.6, top, letter="a", title="Goodfire 4-layer model: which tokens may read the hidden word",
+    text_schematic(cv, 0.6, top, letter="a", title="Goodfire 4-layer model: which tokens can attend to the hidden word",
                    key_at=(4.3, top - 9.75, 6.4, 0))
 
 
@@ -35,7 +34,7 @@ def row_raise(cv, text4l, y0):
     cv.S.text(1.4, top - 1.6, "this word was hidden", fontsize=22, color=BLUE, va="center")
     cv.S.add_patch(plt.Rectangle((5.1, top - 1.8), 0.4, 0.4, facecolor=CLOUD, edgecolor="none"))
     cv.S.text(5.7, top - 1.6, "another word was hidden", fontsize=22, color=SLATE, va="center")
-    for k, (name, col, label) in enumerate(CONDITIONS):
+    for k, (name, col, label) in enumerate(TEXT_CONDITIONS):
         x = 2.8 + 5.6 * k
         ax = cv.axes(x, y0 + 1.9, 5.0, ROWS[1] - 4.3)
         strip_raise(ax, text4l, name, (-3, 16), [0, 0.1, 1, 10], name == "retained")
@@ -65,7 +64,7 @@ def main():
                   title="rescaling {k} VPD subcomponents makes the hidden word the top answer {top:.0f}% of the time "
                         "(from {base:.0f}%)")
     row_circuit(cv, a.parts, 0, rh=ROWS[3], letter="d",
-                title="the recall circuit (recall −{share:.0f}% with its two main attention steps blocked)")
+                title="Claude's circuit model")
     fig.savefig(a.out, dpi=140)                    # 2,800 pixels wide, as main.png
 
 

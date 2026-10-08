@@ -204,8 +204,8 @@ into the later tokens",
 		fontsize=40,
 		height=2.5125,
 		label="layer 3, heads 4 and 5
-read the later tokens
-where the word is recalled",
+where the word is recalled
+attend to the later tokens",
 		penwidth=2.6,
 		pos="2894.2,979.7",
 		style="rounded,filled,bold",
@@ -400,7 +400,7 @@ turns it into the answer
 		height=3.075,
 		label="layer 2 attention
 where the word is recalled:
-an earlier read
+brings in the earlier copy
 (recall −23% without it)",
 		penwidth=2.2,
 		pos="3417.9,1365.7",
