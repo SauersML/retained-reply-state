@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from figure_main import BLUE, CORAL, GOLD, INK, SLATE, CLOUD, centred_logp, p_paired, per_animal, saved_logp
+from figure_goodfire import flow_maps
 
 plt.rcParams.update({"font.family": "Avenir Next", "font.size": 20, "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.4, "xtick.major.width": 1.4, "ytick.major.width": 1.4})
@@ -82,30 +83,11 @@ def documents_head(out="figs/documents_head.png"):
 
 
 def flow(out="figs/flow4l.png"):
-    from matplotlib.colors import LinearSegmentedColormap
-    r = json.load(open("results/fourlayer/mlp_routes.json"))["blocks"]
-    cols = [("word", "hidden word\n\u201cfox\u201d"), ("later", "later tokens\n\u201c. Nobody else knows.\u201d"),
-            ("cue", "where it is recalled\n\u201cMy pet is a\u201d")]
-    cmap = LinearSegmentedColormap.from_list("lost", ["white", "#c9dbf0", BLUE, INK])
     fig, axes = plt.subplots(1, 2, figsize=(17, 7.6))
     fig.subplots_adjust(left=0.08, right=0.86, bottom=0.2, top=0.82, wspace=0.08)
-    for ax, (kind, name) in zip(axes, (("attn", "attention output"), ("mlp", "MLP output"))):
-        M = np.array([[max(0.0, -100 * r[f"{l}.{kind}@{c}"]["raise"]) for c, _ in cols] for l in range(4)])
-        im = ax.imshow(M, cmap=cmap, vmin=0, vmax=100, aspect="auto", origin="lower")
-        for l in range(4):
-            for j in range(3):
-                v = M[l, j]
-                ax.text(j, l, f"\u2212{v:.0f}%" if v >= 0.5 else "0", ha="center", va="center", fontsize=21,
-                        color="white" if v > 55 else INK)
-        ax.set_xticks(range(3), [lab for _, lab in cols], fontsize=17)
-        ax.set_yticks(range(4), [f"layer {l}" for l in range(4)] if kind == "attn" else [""] * 4, fontsize=19)
-        ax.set_title(name, fontsize=22, pad=12)
-        ax.tick_params(length=0)
-        for sp in ax.spines.values():
-            sp.set_visible(False)
-    cb = fig.colorbar(im, cax=fig.add_axes([0.88, 0.2, 0.015, 0.62]))
-    cb.set_label("recall lost without the block's\nword-specific output (%)", fontsize=17)
-    cb.outline.set_visible(False)
+    flow_maps(fig, axes, fig.add_axes([0.88, 0.2, 0.015, 0.62]),
+              [("word", "hidden word\n\u201cfox\u201d"), ("later", "later tokens\n\u201c. Nobody else knows.\u201d"),
+               ("cue", "where it is recalled\n\u201cMy pet is a\u201d")])
     fig.text(0.08, 0.93, "Goodfire 4-layer model: where the hidden word's information flows", fontsize=24, weight="bold")
     fig.savefig(out, dpi=110, facecolor="white")
 

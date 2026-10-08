@@ -46,17 +46,17 @@ H = sum(ROWS)
 
 
 class Canvas:
-    """Drawing in inch units over the whole figure; y counts up from the bottom."""
+    """Drawing in inch units over the whole figure (width x height); y counts up from the bottom."""
 
-    def __init__(self, fig):
-        self.fig = fig
+    def __init__(self, fig, width=W, height=H):
+        self.fig, self.width, self.height = fig, width, height
         self.S = fig.add_axes([0, 0, 1, 1], zorder=-1)
-        self.S.set_xlim(0, W)
-        self.S.set_ylim(0, H)
+        self.S.set_xlim(0, width)
+        self.S.set_ylim(0, height)
         self.S.axis("off")
 
     def axes(self, x, y, w, h):
-        return self.fig.add_axes([x / W, y / H, w / W, h / H])
+        return self.fig.add_axes([x / self.width, y / self.height, w / self.width, h / self.height])
 
     def block(self, x, y, w, h, face, edge, text="", color=INK, style="-", fs=24):
         self.S.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.14", facecolor=face,
@@ -549,16 +549,19 @@ def row_circuits(cv, refits, y0):
     row_fourlayer(cv, refits, y0, x0=13.6)
 
 
-def row_fourlayer(cv, refits, y0, x0=0.0):
-    """Panel i, at x0 in the row [y0, y0 + ROWS[3]].
+I_TITLE = ("Goodfire 4-layer model: rescaling {k}\nVPD subcomponents makes the hidden word\n"
+           "the top answer {top:.0f}% of the time (from {base:.0f}%)")
+
+
+def row_fourlayer(cv, refits, y0, x0=0.0, rh=ROWS[3], letter="i", title=I_TITLE):
+    """Panel i, at x0 in the row [y0, y0 + rh].
     i: Goodfire's 4-layer model, the fewest VPD subcomponents that make the hidden word the top answer: for each K, the
        scales of only the K largest subcomponents of a fitted edit fitted again on the training templates; on held-out
        templates, how often the hidden word is the model's first choice among the 50 words, against K, colored by KL on
        held-out Pile text (fourlayer/optimize_edit.py --support).
     j: the recall circuit, two attention steps and the VPD subcomponents measured to switch them on or off
        (fourlayer/attention_gates.py, subcomponent_circuit.py), drawn by Graphviz."""
-    import circuit_dot
-    top = y0 + ROWS[3]
+    top = y0 + rh
     rows = sorted((o["support_k"], o["metrics"]) for path in refits if os.path.exists(path)
                   for o in json.load(open(path)).get("optimized", []))
     base = 100 * json.load(open(refits[0]))["unedited"]["top1"]
@@ -567,15 +570,14 @@ def row_fourlayer(cv, refits, y0, x0=0.0):
     kl = np.array([m["pile_kl"] for _, m in rows])
     k90 = next(k for k, t in zip(ks, t1) if t >= 0.9 * max(t1))           # the fewest that reach 90% of the best
     t90 = t1[ks.index(k90)]
-    cv.letter(x0 + 0.1, top - 0.75, "i")
-    cv.S.text(x0 + 0.9, top - 0.75, f"Goodfire 4-layer model: rescaling {k90}\nVPD subcomponents makes the hidden word\n"
-              f"the top answer {t90:.0f}% of the time (from {base:.0f}%)",
+    cv.letter(x0 + 0.1, top - 0.75, letter)
+    cv.S.text(x0 + 0.9, top - 0.75, title.format(k=k90, top=t90, base=base),
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(x0 + 2.4, y0 + 1.6, 9.6, ROWS[3] - 3.9)
+    ax = cv.axes(x0 + 2.4, y0 + 1.6, 9.6, rh - 3.9)
     ax.plot(ks, t1, "-", color=CLOUD, lw=2.5, zorder=2)
     sc = ax.scatter(ks, t1, c=kl, cmap=LinearSegmentedColormap.from_list("kl", ["#d6e4f5", BLUE, INK]),
                     vmin=0, vmax=max(0.05, float(kl.max())), s=110, edgecolor="white", lw=1.2, zorder=3)
-    cb = cv.fig.colorbar(sc, cax=cv.axes(x0 + 12.4, y0 + 1.6, 0.22, ROWS[3] - 3.9))
+    cb = cv.fig.colorbar(sc, cax=cv.axes(x0 + 12.4, y0 + 1.6, 0.22, rh - 3.9))
     cb.set_label("damage on held-out Pile text\n(KL, nats per token)", fontsize=17)
     cb.ax.tick_params(labelsize=15)
     cb.outline.set_visible(False)
@@ -594,12 +596,13 @@ def row_schematic(cv, y0):
     text_schematic(cv, 0.6, y0 + ROWS[4])
 
 
-def text_schematic(cv, x0, top):
+def text_schematic(cv, x0, top, letter="j", title="Goodfire 4-layer model: the same test in plain text", key_at=None):
     """Panel j: the three conditions of Goodfire's 4-layer model in plain text (fourlayer/hidden_span.py): attention
-    masks, in every layer, decide which later tokens may read the hidden word; arcs from the word to its readers."""
+    masks, in every layer, decide which later tokens may read the hidden word; arcs from the word to its readers.
+    key_at: (x, y, dx, dy) of the key's first entry and the step to its second (default: to the right, stacked)."""
     S, h = cv.S, 0.95
-    cv.letter(x0 - 0.5, top - 0.75, "j")
-    S.text(x0 + 0.3, top - 0.75, "Goodfire 4-layer model: the same test in plain text", fontsize=25, weight="bold", va="center")
+    cv.letter(x0 - 0.5, top - 0.75, letter)
+    S.text(x0 + 0.3, top - 0.75, title, fontsize=25, weight="bold", va="center")
     rows = [("stripped", SLATE, "no later token\nreads the word", False, False),
             ("retained", BLUE, "only the later\ntokens read it", True, False),
             ("visible", CORAL, "every later\ntoken reads it", True, True)]
@@ -625,12 +628,13 @@ def text_schematic(cv, x0, top):
         wx = xs["word"][0] + xs["word"][1] / 2
         arc(xs["word"][0] + xs["word"][1] - 0.15, xs["later"][0] + 1.3, y + h + 0.05, later_ok, -0.5)
         arc(wx - 0.2, xs["cue"][0] + xs["cue"][1] / 2, y + h + 0.05, cue_ok, -0.33)
-    kx, ky = x0 + 17.2, top - 3.3 - 2.55 + h / 2
-    S.annotate("", xy=(kx + 1.2, ky + 0.45), xytext=(kx, ky + 0.45), arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=3, mutation_scale=22))
-    S.text(kx + 1.4, ky + 0.45, "the token reads the word", fontsize=21, color=BLUE, va="center")
-    S.plot([kx, kx + 1.2], [ky - 0.45, ky - 0.45], color=CORAL, lw=3, ls=(0, (3, 2)))
-    S.text(kx + 0.6, ky - 0.45, "\u00d7", ha="center", va="center", fontsize=30, color=CORAL, weight="bold")
-    S.text(kx + 1.4, ky - 0.45, "blocked by the attention mask", fontsize=21, color=CORAL, va="center")
+    kx, ky, dx, dy = key_at or (x0 + 17.2, top - 3.3 - 2.55 + h / 2 + 0.45, 0, -0.9)
+    S.annotate("", xy=(kx + 1.2, ky), xytext=(kx, ky), arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=3, mutation_scale=22))
+    S.text(kx + 1.4, ky, "the token reads the word", fontsize=21, color=BLUE, va="center")
+    kx, ky = kx + dx, ky + dy
+    S.plot([kx, kx + 1.2], [ky, ky], color=CORAL, lw=3, ls=(0, (3, 2)))
+    S.text(kx + 0.6, ky, "\u00d7", ha="center", va="center", fontsize=30, color=CORAL, weight="bold")
+    S.text(kx + 1.4, ky, "blocked by the attention mask", fontsize=21, color=CORAL, va="center")
 
 
 MECH_ATT, MECH_WORD = "results/fp32/attention_all.npz", "results/fp32/wording_heldout_mac.npz"
@@ -731,23 +735,25 @@ def row_mechanism(cv, y0, held, other):
 
 
 
-def row_circuit(cv, parts, y0):
-    """Panel k, occupying [y0, y0 + ROWS[5]]: the 4-layer recall circuit's attention route and the VPD subcomponents
+K_TITLE = "Goodfire 4-layer model: the recall circuit (recall \u2212{share:.0f}% with its two main attention steps blocked)"
+
+
+def row_circuit(cv, parts, y0, rh=ROWS[5], letter="k", title=K_TITLE):
+    """Panel k, occupying [y0, y0 + rh]: the 4-layer recall circuit's attention route and the VPD subcomponents
     measured to switch it (fourlayer/attention_gates.py), drawn by Graphviz."""
     import circuit_dot
     if not parts or not os.path.exists(parts):
         return
-    top = y0 + ROWS[5]
+    top = y0 + rh
     g = json.load(open(parts))
-    cv.letter(0.1, top - 0.75, "k")
+    cv.letter(0.1, top - 0.75, letter)
     stress = json.load(open(os.path.join(os.path.dirname(parts), "stress_circuit.json")))
     share = 1 - stress["routes"]["circuit blocked"]["raise"] / stress["unedited"]["raise"]    # blocking both steps
-    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: the recall circuit (recall \u2212{100 * share:.0f}% with its two main attention steps blocked)",
-              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    cv.S.text(0.9, top - 0.75, title.format(share=100 * share), fontsize=25, weight="bold", va="center", linespacing=1.15)
     key(cv, 1.2, top - 1.8)
     routes = json.load(open(os.path.join(os.path.dirname(parts), "mlp_routes.json")))
     image(cv, circuit_dot.render(*circuit_dot.gates_dot(g, routes)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g, routes)[1]),
-          0.9, top - 3.05, 26.4, ROWS[5] - 3.2)
+          0.9, top - 3.05, 26.4, rh - 3.2)
 
 
 def key(cv, x, y):
