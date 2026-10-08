@@ -5,10 +5,10 @@ original model and layer 21 key-value head 6 switched off, asking every turn-2 q
 and each after Janus's LLM explainer and after a CPU explainer of the same length and style); the control heads on the
 held-out runs; countries, turn 1 without "Do not reveal it.", and both turns in wording B, with head 21.6 switched off.
 Group "other": Qwen3-0.6B (same questions, head 21.6 switched off), Qwen3-4B and Qwen3-8B (two sets each, unedited).
-DOCS holds explainer.txt (Janus's LLM explainer) and cpu_explainer.txt (documents/cpu_explainer.txt).
+DOCS (default documents/) holds janus_llm_explainer.txt (Janus's LLM explainer) and cpu_explainer.txt (the control).
 --only runs the named jobs of any group; --sync HOST:DIR copies each finished output (and its .done marker) there, so a
 second machine sharing the work skips it.
-usage: fp32_runs.py GROUP WINDOWS.u32 DOCS --device cuda [--only NAME,...] [--sync HOST:DIR]
+usage: fp32_runs.py GROUP WINDOWS.u32 [DOCS] --device cuda [--only NAME,...] [--sync HOST:DIR]
 """
 import argparse
 import os
@@ -24,14 +24,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("group", choices=["1.7b", "other", "all"])
     ap.add_argument("windows")
-    ap.add_argument("docs")
+    ap.add_argument("docs", nargs="?", default="documents")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--only", default="")
     ap.add_argument("--sync", default="")
     a = ap.parse_args()
     A, B, N = task("A")["recall"], task("B")["recall"], task("A")["neutral"]
-    doc = open(os.path.join(a.docs, "explainer.txt")).read().strip()
+    doc = open(os.path.join(a.docs, "janus_llm_explainer.txt")).read().strip()
     cpu = open(os.path.join(a.docs, "cpu_explainer.txt")).read().strip()
     questions = {"recall_B": B, "doc_A": doc + "\n\n" + A, "doc_B": doc + "\n\n" + B, "doc_neutral": doc + "\n\n" + N,
                  "cpu_A": cpu + "\n\n" + A, "cpu_B": cpu + "\n\n" + B, "cpu_neutral": cpu + "\n\n" + N}
