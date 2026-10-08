@@ -461,14 +461,14 @@ def row_head(cv, y0, flip_groups, npz, other):
         cv.S.text(20.25, yy, lab, fontsize=17, color=col, va="center")
     held = npz.split("+")[0]
     groups = [(npz, "none", "Qwen3-1.7B"), (other, "none", "Qwen3-0.6B"), (held, "21:6*0", "Qwen3-1.7B,\nhead 21.6\nswitched off")]
-    ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.2)
+    ax = cv.axes(20.9, y0 + 2.6, 5.75, ROWS[1] - 5.6)
     panel_paired(ax, [(saved_logp(sp, f"{e}|retained")[0], saved_logp(sp, f"{e}|recall_B")[0], saved_logp(sp, f"{e}|retained")[1])
                       for sp, e, _ in groups], (5, 102))
     ax.set_xticks([3 * k + 0.6 for k in range(len(groups))], [lab for *_, lab in groups], fontsize=18)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
-    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, 5.2))
+    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, ROWS[1] - 5.6))
     cb.set_ticks([-1, 0, 1], labels=["½×", "1×", "2×"])
     cb.set_label("change per line (d-g)", fontsize=16, labelpad=2)
     cb.ax.tick_params(labelsize=17)
@@ -496,7 +496,7 @@ def row_controls(cv, y0, npz, other):
     for yy, col, lab in ((top - 2.25, SLATE, "question alone"), (top - 2.8, BLUE, "Janus's LLM explainer first")):
         cv.S.scatter([1.1], [yy], s=110, color=col)
         cv.S.text(1.35, yy, lab, fontsize=19, color=col, va="center")
-    ax = cv.axes(1.9, y0 + 1.6, 5.9, 5.5)
+    ax = cv.axes(1.9, y0 + 1.6, 5.9, ROWS[2] - 4.9)
     panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{qd}")[0], saved_logp(sp, f"none|{q0}")[1])
                       for sp, _, q0, _, qd, _ in qs], (0, 102))
     ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
@@ -512,7 +512,7 @@ def row_controls(cv, y0, npz, other):
                             (9.9, top - 2.8, BLUE, "Janus's LLM explainer first")):
         cv.S.scatter([x], [yy], s=110, color=col)
         cv.S.text(x + 0.25, yy, lab, fontsize=19, color=col, va="center")
-    ax = cv.axes(10.4, y0 + 1.6, 7.7, 5.5)
+    ax = cv.axes(10.4, y0 + 1.6, 7.7, ROWS[2] - 4.9)
     panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
                        saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (0, 120))
     ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
@@ -521,7 +521,7 @@ def row_controls(cv, y0, npz, other):
 
     cv.letter(18.9, top - 0.75, "h")
     cv.S.text(19.7, top - 0.75, "Qwen3-1.7B: the head circuit", fontsize=25, weight="bold", va="center")
-    image(cv, circuit_dot.render(circuit_dot.qwen_dot(), "figs/circuit_qwen"), 18.9, top - 1.6, 9.0, 9.2, middle=True)
+    image(cv, circuit_dot.render(circuit_dot.qwen_dot(), "figs/circuit_qwen"), 18.9, top - 1.35, 9.0, ROWS[2] - 1.6)
 
 
 def row_fourlayer(cv, refits, parts, y0):
@@ -546,11 +546,11 @@ def row_fourlayer(cv, refits, parts, y0):
     cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: rescaling {k90}\nVPD subcomponents makes the hidden word\n"
               f"the top answer {t90:.0f}% of the time (from {base:.0f}%)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(2.4, y0 + 1.6, 5.4, 6.2)
+    ax = cv.axes(2.4, y0 + 1.6, 5.4, ROWS[3] - 3.9)
     ax.plot(ks, t1, "-", color=CLOUD, lw=2.5, zorder=2)
     sc = ax.scatter(ks, t1, c=kl, cmap=LinearSegmentedColormap.from_list("kl", ["#d6e4f5", BLUE, INK]),
                     vmin=0, vmax=max(0.05, float(kl.max())), s=110, edgecolor="white", lw=1.2, zorder=3)
-    cb = cv.fig.colorbar(sc, cax=cv.axes(8.2, y0 + 1.6, 0.22, 6.2))
+    cb = cv.fig.colorbar(sc, cax=cv.axes(8.2, y0 + 1.6, 0.22, ROWS[3] - 3.9))
     cb.set_label("damage on held-out Pile text\n(KL, nats per token)", fontsize=17)
     cb.ax.tick_params(labelsize=15)
     cb.outline.set_visible(False)
@@ -570,9 +570,9 @@ def row_fourlayer(cv, refits, parts, y0):
     share = 1 - stress["routes"]["circuit blocked"]["raise"] / stress["unedited"]["raise"]    # blocking both steps
     cv.S.text(11.2, top - 0.75, f"Goodfire 4-layer model: the attention route behind {100 * share:.0f}% of recall",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    key(cv, 11.4, top - 2.3)
+    key(cv, 11.4, top - 1.8)
     image(cv, circuit_dot.render(*circuit_dot.gates_dot(g)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g)[1]),
-          10.6, top - 3.1, 17.2, 9.1, middle=True)
+          10.6, top - 2.75, 17.2, ROWS[3] - 3.0)
 
 
 def key(cv, x, y):

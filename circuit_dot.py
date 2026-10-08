@@ -78,7 +78,7 @@ def gates_dot(g):
         wires.append(f'  {a} -> {a}_{b} -> {b} [style=invis, weight=3];')
         return "\n".join(wires)
     return f"""digraph G {{
-  rankdir=LR; splines=spline; nodesep=0.3; ranksep=0.45; bgcolor="white"; pad=0.1;
+  rankdir=LR; splines=spline; nodesep=0.48; ranksep=0.45; bgcolor="white"; pad=0.1;
   node [shape=box, fontname="{FONT}", fontsize=37, margin="0.18,0.1"];
   edge [fontname="{FONT}", fontsize=31, fontcolor="{SLATE}"];
   {{ rank=same; word [label="hidden word\n“fox”", {token}]; later [label="later tokens\n“. Nobody else knows.”", {token}];
@@ -110,7 +110,7 @@ def qwen_dot():
     how much the suppressing head reads."""
     token = f'style="rounded,filled", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}"'
     return f"""digraph G {{
-  rankdir=BT; splines=spline; nodesep=0.55; ranksep=0.6; bgcolor="white"; pad=0.2;
+  rankdir=BT; splines=spline; nodesep=0.55; ranksep=1.15; bgcolor="white"; pad=0.2;
   node [shape=box, fontname="{FONT}", fontsize=19, margin="0.2,0.1"];
   edge [fontname="{FONT}", fontsize=16, fontcolor="{SLATE}"];
   {{ rank=same; reply [label="reply “I understand.”\\n(its cache kept from turn 1;\\nthe “.” holds the hidden animal)", {token}];
