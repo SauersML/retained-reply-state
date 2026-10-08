@@ -425,8 +425,8 @@ def row_head(cv, y0, flip_groups, npz, other):
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
     panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{qd}")[0], saved_logp(sp, f"none|{q0}")[1])
-                      for sp, _, q0, _, qd, _ in qs], (5, 102))
-    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
+                      for sp, _, q0, _, qd, _ in qs], (0, 102))
+    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=17)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
@@ -459,8 +459,8 @@ def row_controls(cv, y0, npz, other):
         cv.S.text(x + 0.25, top - 2.0, lab, fontsize=19, color=col, va="center")
     ax = cv.axes(2.0, y0 + 1.75, 9.6, 6.3)
     panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
-                       saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (5, 120))
-    ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab.replace("\n", " ", 1) for *_, lab in qs], fontsize=17)
+                       saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (0, 120))
+    ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab.replace("\n", " ", 1) for *_, lab in qs], fontsize=19)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
@@ -525,24 +525,24 @@ def key(cv, x, y):
     """Visual key of the circuit diagrams: wire kinds and widths."""
     S = cv.S
     S.annotate("", xy=(x + 0.9, y), xytext=(x, y), arrowprops=dict(arrowstyle="-|>", lw=3.5, color=BLUE, mutation_scale=22))
-    S.text(x + 1.05, y, "needed for recall", fontsize=19, color=BLUE, va="center")
+    S.text(x + 1.05, y, "needed for recall", fontsize=22, color=BLUE, va="center")
     x2 = x + 4.1
     S.plot([x2, x2 + 0.85], [y, y], color=CORAL, lw=3.5, solid_capstyle="butt")
     S.plot([x2 + 0.85, x2 + 0.85], [y - 0.17, y + 0.17], color=CORAL, lw=4.5, solid_capstyle="butt")
-    S.text(x2 + 1.05, y, "holds recall back", fontsize=19, color=CORAL, va="center")
+    S.text(x2 + 1.05, y, "holds recall back", fontsize=22, color=CORAL, va="center")
     x3 = x2 + 4.1
     S.annotate("", xy=(x3 + 0.9, y), xytext=(x3, y), arrowprops=dict(arrowstyle="-|>", lw=2, color=CLOUD,
                ls=(0, (4, 2)), mutation_scale=16))
-    S.text(x3 + 1.05, y, "input from that token", fontsize=19, color=SLATE, va="center")
+    S.text(x3 + 1.05, y, "input from that token", fontsize=22, color=SLATE, va="center")
     y2 = y - 0.6
     S.annotate("", xy=(x + 0.9, y2), xytext=(x, y2), arrowprops=dict(arrowstyle="-|>", lw=1.5, color=BLUE, mutation_scale=16))
-    S.text(x + 1.05, y2, "small effect", fontsize=17, color=SLATE, va="center")
+    S.text(x + 1.05, y2, "small effect", fontsize=20, color=SLATE, va="center")
     S.annotate("", xy=(x2 + 0.9, y2), xytext=(x2, y2), arrowprops=dict(arrowstyle="-|>", lw=6, color=BLUE, mutation_scale=26))
-    S.text(x2 + 1.05, y2, "large effect", fontsize=17, color=SLATE, va="center")
+    S.text(x2 + 1.05, y2, "large effect", fontsize=20, color=SLATE, va="center")
     for dy in (-0.12, -0.04, 0.04, 0.12):
         S.annotate("", xy=(x3 + 0.9, y2 + dy), xytext=(x3, y2 + dy), arrowprops=dict(arrowstyle="-|>", lw=0.8, color=SLATE,
                    mutation_scale=7))
-    S.text(x3 + 1.05, y2, "the word's identity, spread over\nmany value subcomponents", fontsize=16, color=SLATE, va="center",
+    S.text(x3 + 1.05, y2, "the word's identity, spread over\nmany value subcomponents", fontsize=19, color=SLATE, va="center",
            linespacing=1.0)
 
 

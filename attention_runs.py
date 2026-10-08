@@ -24,12 +24,13 @@ def main():
     ap.add_argument("--layers", default="21")
     ap.add_argument("--max-runs", type=int, default=600)
     ap.add_argument("--device", default="mps")
+    ap.add_argument("--dtype", default="float32", choices=["float32", "bfloat16"])
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     d = json.load(open(a.result))
     T = task_of(d)
     tok = AutoTokenizer.from_pretrained(d["model"])
-    model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=torch.bfloat16, device_map=a.device,
+    model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=getattr(torch, a.dtype), device_map=a.device,
                                                  attn_implementation="eager").eval()
     inv_freq = model.model.rotary_emb.inv_freq.detach().cpu()
     layers = [int(x) for x in a.layers.split(",")]

@@ -65,7 +65,7 @@ def gates_dot(g):
     info = f'color="{CLOUD}", penwidth=2.2, style=dashed, arrowhead=normal, arrowsize=0.9'
     token = f'style="rounded,filled", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}"'
     part = f'style="rounded,filled", fillcolor="white", penwidth=2.2'
-    head = f'style="rounded,filled,bold", fillcolor="{PALE_BLUE}", color="{BLUE}", fontcolor="{INK}", fontsize=33, penwidth=2.6'
+    head = f'style="rounded,filled,bold", fillcolor="{PALE_BLUE}", color="{BLUE}", fontcolor="{INK}", fontsize=40, penwidth=2.6'
 
     snap = []
 
@@ -74,13 +74,13 @@ def gates_dot(g):
         between the two ends, so dot sets it beside the wires and keeps other nodes clear of it."""
         snap.append((f"{a}_{b}", a, b))
         wires = [f'  {a} -> {b} [color="{SLATE}", penwidth=0.9, arrowsize=0.55];' for _ in range(k)]
-        wires.append(f'  {a}_{b} [shape=plaintext, label="{label}", fontcolor="{SLATE}", fontsize=26, margin=0];')
+        wires.append(f'  {a}_{b} [shape=plaintext, label="{label}", fontcolor="{SLATE}", fontsize=31, margin=0];')
         wires.append(f'  {a} -> {a}_{b} -> {b} [style=invis, weight=3];')
         return "\n".join(wires)
     return f"""digraph G {{
   rankdir=LR; splines=spline; nodesep=0.3; ranksep=0.45; bgcolor="white"; pad=0.1;
-  node [shape=box, fontname="{FONT}", fontsize=30, margin="0.18,0.1"];
-  edge [fontname="{FONT}", fontsize=26, fontcolor="{SLATE}"];
+  node [shape=box, fontname="{FONT}", fontsize=37, margin="0.18,0.1"];
+  edge [fontname="{FONT}", fontsize=31, fontcolor="{SLATE}"];
   {{ rank=same; word [label="hidden word\n“fox”", {token}]; later [label="later tokens\n“. Nobody else knows.”", {token}];
     cue [label="where the word is recalled\n“My pet is a”", {token}]; }}
   {{ rank=same; k2 [label="layer 2 keys\nat the hidden word\n(2 subcomponents)", color="{BLUE}", fontcolor="{BLUE}", {part}];
@@ -90,7 +90,7 @@ def gates_dot(g):
     q3 [label="layer 3 query\nwhere the word\nis recalled", color="{BLUE}", fontcolor="{BLUE}", {part}];
     b3 [label="layer 3 queries\nwhere the word\nis recalled\n(2 subcomponents)", color="{CORAL}", fontcolor="{CORAL}", {part}]; }}
   h3 [label="layer 3, heads 4 and 5\nread the later tokens\nwhere the word is recalled", {head}];
-  answer [label="answer:\n“fox”", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=33];
+  answer [label="answer:\n“fox”", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=40];
   word -> k2 [{info}]; later -> q2 [{info}]; later -> k3 [{info}]; cue -> q3 [{info}]; cue -> b3 [{info}];
 {bundle("word", "h2", "78 value\\nsubcomponents")}
   k2 -> h2 [{need(E("h.2.attn.k_proj#224@word", "h.2.attn.k_proj#206@word"))}];
