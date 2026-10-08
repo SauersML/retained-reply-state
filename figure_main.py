@@ -39,7 +39,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [13.3, 11.5, 11.5, 11.5, 9.2, 15.8]  # heights of the six rows
+ROWS = [13.3, 11.5, 11.5, 11.5, 9.2, 12.9]  # heights of the six rows
 H = sum(ROWS)
 
 
@@ -634,11 +634,12 @@ def row_circuit(cv, parts, y0):
     cv.letter(0.1, top - 0.75, "k")
     stress = json.load(open(os.path.join(os.path.dirname(parts), "stress_circuit.json")))
     share = 1 - stress["routes"]["circuit blocked"]["raise"] / stress["unedited"]["raise"]    # blocking both steps
-    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: the attention route behind {100 * share:.0f}% of recall",
+    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: the recall circuit (blocking its two main attention steps removes {100 * share:.0f}% of recall)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     key(cv, 1.2, top - 1.8)
-    image(cv, circuit_dot.render(*circuit_dot.gates_dot(g)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g)[1]),
-          0.9, top - 2.75, 26.4, ROWS[5] - 3.0)
+    routes = json.load(open(os.path.join(os.path.dirname(parts), "mlp_routes.json")))
+    image(cv, circuit_dot.render(*circuit_dot.gates_dot(g, routes)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g, routes)[1]),
+          0.9, top - 3.05, 26.4, ROWS[5] - 3.2)
 
 
 def key(cv, x, y):

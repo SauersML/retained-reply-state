@@ -1,0 +1,301 @@
+{
+ "unedited": {
+  "raise": 0.26774322430292763,
+  "top1": 0.03208333333333333,
+  "att_2_3": 0.08314260669673483,
+  "att_3_45": 0.12334949239933242
+ },
+ "blocks": {
+  "0.mlp@word": {
+   "raise": -0.746244573406097,
+   "att_2_3": 0.0633027760239897,
+   "att_3_45": 0.015441305946005235
+  },
+  "0.attn@later": {
+   "raise": -0.24179676633773217,
+   "att_2_3": 0.0024032536721598774,
+   "att_3_45": -0.0019489914659761576
+  },
+  "1.mlp@cue": {
+   "raise": 0.009368705187656312,
+   "att_2_3": 0.0,
+   "att_3_45": -5.3851077242428325e-05
+  },
+  "2.mlp@word": {
+   "raise": 0.0,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  },
+  "2.attn@later": {
+   "raise": -0.6206039425003479,
+   "att_2_3": 0.0,
+   "att_3_45": 0.021023036985038823
+  },
+  "3.mlp@cue": {
+   "raise": -0.30498929652326034,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  },
+  "0.mlp@later": {
+   "raise": -0.22526201610849217,
+   "att_2_3": 0.0013093172005977927,
+   "att_3_45": -0.0010141916177940358
+  },
+  "0.attn@cue": {
+   "raise": -9.12736610736431e-08,
+   "att_2_3": 0.0,
+   "att_3_45": -1.667352367284991e-08
+  },
+  "1.attn@word": {
+   "raise": -0.005547631682536802,
+   "att_2_3": 0.006332535453029475,
+   "att_3_45": 0.0035890137290313096
+  },
+  "2.mlp@later": {
+   "raise": -0.03924335331025364,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0014049818912713619
+  },
+  "2.attn@cue": {
+   "raise": -0.23160109098353565,
+   "att_2_3": 0.0,
+   "att_3_45": -0.0007787806533511299
+  },
+  "3.attn@word": {
+   "raise": 0.0,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  },
+  "0.mlp@cue": {
+   "raise": 1.4841246009922315e-09,
+   "att_2_3": 0.0,
+   "att_3_45": -6.763787918639963e-08
+  },
+  "1.mlp@word": {
+   "raise": 0.008144828536906346,
+   "att_2_3": 0.03696975199851926,
+   "att_3_45": -0.00010438160650916295
+  },
+  "1.attn@later": {
+   "raise": -0.18389481486144044,
+   "att_2_3": 0.020237138164804325,
+   "att_3_45": -0.006546654911035454
+  },
+  "2.mlp@cue": {
+   "raise": -0.008728251263762532,
+   "att_2_3": 0.0,
+   "att_3_45": -0.000348329729684127
+  },
+  "3.mlp@word": {
+   "raise": 0.0,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  },
+  "3.attn@later": {
+   "raise": 0.0,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  },
+  "0.attn@word": {
+   "raise": -0.048150164053794575,
+   "att_2_3": 0.0070514258338867375,
+   "att_3_45": -0.005951115968615417
+  },
+  "1.mlp@later": {
+   "raise": -0.021911928349386378,
+   "att_2_3": -0.009822563165840403,
+   "att_3_45": -0.0011156103706001508
+  },
+  "1.attn@cue": {
+   "raise": -0.03889557543076039,
+   "att_2_3": 0.0,
+   "att_3_45": 2.2427147763348643e-05
+  },
+  "2.attn@word": {
+   "raise": 0.0,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  },
+  "3.mlp@later": {
+   "raise": 0.0,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  },
+  "3.attn@cue": {
+   "raise": -0.818537362181632,
+   "att_2_3": 0.0,
+   "att_3_45": 0.0
+  }
+ },
+ "parts": {
+  "h.0.mlp.c_fc#1443@word": {
+   "raise": -0.011000000000000001
+  },
+  "h.0.mlp.c_fc#1275@word": {
+   "raise": -0.01
+  },
+  "h.0.mlp.c_fc#53@word": {
+   "raise": -0.001
+  },
+  "h.0.mlp.c_fc#614@word": {
+   "raise": -0.01
+  },
+  "h.0.mlp.c_fc#1189@word": {
+   "raise": -0.01
+  },
+  "h.0.mlp.c_fc#1933@word": {
+   "raise": -0.006999999999999999
+  },
+  "h.0.mlp.c_fc#2959@word": {
+   "raise": 0.004
+  },
+  "h.0.mlp.c_fc#229@word": {
+   "raise": 0.0
+  },
+  "h.0.mlp.c_fc#1782@word": {
+   "raise": -0.001
+  },
+  "h.0.mlp.c_fc#497@word": {
+   "raise": -0.005
+  },
+  "h.0.mlp.c_fc#2583@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.c_fc#1564@word": {
+   "raise": -0.011000000000000001
+  },
+  "h.0.mlp.c_fc#969@word": {
+   "raise": -0.0
+  },
+  "h.0.mlp.c_fc#2524@word": {
+   "raise": 0.0
+  },
+  "h.0.mlp.c_fc#775@word": {
+   "raise": -0.0
+  },
+  "h.0.mlp.c_fc#2822@word": {
+   "raise": -0.005
+  },
+  "h.0.mlp.c_fc#1879@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.c_fc#2445@word": {
+   "raise": -0.004
+  },
+  "h.0.mlp.c_fc#1091@word": {
+   "raise": -0.001
+  },
+  "h.0.mlp.c_fc#277@word": {
+   "raise": 0.0
+  },
+  "h.0.mlp.c_fc#1663@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.c_fc#852@word": {
+   "raise": -0.006
+  },
+  "h.0.mlp.c_fc#2857@word": {
+   "raise": -0.004
+  },
+  "h.0.mlp.c_fc#1435@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.c_fc#1838@word": {
+   "raise": 0.0
+  },
+  "h.0.mlp.c_fc#1908@word": {
+   "raise": -0.005
+  },
+  "h.0.mlp.c_fc#507@word": {
+   "raise": 0.002
+  },
+  "h.0.mlp.c_fc#1032@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.down_proj#1284@word": {
+   "raise": -0.003
+  },
+  "h.0.mlp.down_proj#3257@word": {
+   "raise": -0.003
+  },
+  "h.0.mlp.c_fc#664@word": {
+   "raise": -0.006
+  },
+  "h.0.mlp.c_fc#1512@word": {
+   "raise": -0.001
+  },
+  "h.0.mlp.down_proj#3196@word": {
+   "raise": -0.006999999999999999
+  },
+  "h.0.mlp.down_proj#3455@word": {
+   "raise": -0.01
+  },
+  "h.0.mlp.down_proj#406@word": {
+   "raise": -0.006999999999999999
+  },
+  "h.0.mlp.down_proj#2606@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.down_proj#2367@word": {
+   "raise": -0.003
+  },
+  "h.0.mlp.down_proj#3393@word": {
+   "raise": -0.008
+  },
+  "h.0.mlp.down_proj#1587@word": {
+   "raise": -0.009000000000000001
+  },
+  "h.0.mlp.down_proj#1493@word": {
+   "raise": -0.006999999999999999
+  },
+  "h.0.mlp.down_proj#1363@word": {
+   "raise": -0.004
+  },
+  "h.0.mlp.down_proj#2041@word": {
+   "raise": -0.006999999999999999
+  },
+  "h.0.mlp.down_proj#473@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.down_proj#2994@word": {
+   "raise": -0.006
+  },
+  "h.0.mlp.down_proj#1515@word": {
+   "raise": -0.01
+  },
+  "h.0.mlp.down_proj#137@word": {
+   "raise": -0.004
+  },
+  "h.0.mlp.down_proj#2044@word": {
+   "raise": -0.003
+  },
+  "h.0.mlp.down_proj#2275@word": {
+   "raise": -0.006
+  },
+  "h.0.mlp.down_proj#785@word": {
+   "raise": -0.001
+  },
+  "h.0.mlp.down_proj#2196@word": {
+   "raise": -0.008
+  },
+  "h.0.mlp.down_proj#3213@word": {
+   "raise": -0.002
+  },
+  "h.0.mlp.down_proj#1385@word": {
+   "raise": -0.011000000000000001
+  },
+  "h.0.mlp.down_proj#3382@word": {
+   "raise": -0.004
+  },
+  "h.0.mlp.down_proj#384@word": {
+   "raise": -0.001
+  },
+  "h.0.mlp.down_proj#920@word": {
+   "raise": -0.003
+  },
+  "h.0.mlp.down_proj#1925@word": {
+   "raise": -0.009000000000000001
+  }
+ },
+ "note": "parts: the screen of layer 0's MLP at the word (30 c_fc and 22 down_proj subcomponents with the largest |x.v| there, each set to its template mean alone); stopped before the other MLP blocks were screened"
+}

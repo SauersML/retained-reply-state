@@ -16,8 +16,8 @@ DOT, NEATO = "/opt/homebrew/bin/dot", "/opt/homebrew/bin/neato"
 
 
 def render(dot, path, dpi=220, snap=()):
-    """dot -> PNG; returns the image array.  snap: (label node, tail, head) -- after layout, each label node is moved up
-    until its top sits just under the lowest wire from tail to head (dot leaves a full node gap there)."""
+    """dot -> PNG; returns the image array.  snap: (label node, tail, head) -- after layout, each label node is placed
+    with its bottom just above the highest wire from tail to head (the gate wires run below the bundles)."""
     with open(path + ".dot", "w") as f:
         f.write(dot)
     if not snap:
@@ -34,8 +34,8 @@ def render(dot, path, dpi=220, snap=()):
         w, h = 72 * float(o["width"]), 72 * float(o["height"])
         pts = [tuple(map(float, t.split(",")[-2:])) for e in js["edges"] if (obj[e["tail"]]["name"], obj[e["head"]]["name"]) == (a, b)
                for t in e["pos"].split()]
-        under = [py for px, py in pts if x - w / 2 <= px <= x + w / 2] or [py for _, py in pts]
-        moves.append(f'  {lab} [pos="{x:.1f},{max(y, min(under) - 4 - h / 2):.1f}"];')
+        near = [py for px, py in pts if x - w / 2 <= px <= x + w / 2] or [py for _, py in pts]
+        moves.append(f'  {lab} [pos="{x:.1f},{max(near) + 4 + h / 2:.1f}"];')
     with open(path + ".dot", "w") as f:
         f.write(laid.rstrip().rstrip("}") + "\n" + "\n".join(moves) + "\n}\n")
     subprocess.run([NEATO, "-n2", "-Tpng", f"-Gdpi={dpi}", "-o", path + ".png", path + ".dot"], check=True)
@@ -51,10 +51,12 @@ DRAWN = ["h.2.attn.k_proj#224@word", "h.2.attn.k_proj#206@word", "h.2.attn.q_pro
          "h.3.attn.k_proj#507@later", "h.3.attn.q_proj#182@cue", "h.3.attn.q_proj#334@cue", "h.3.attn.q_proj#60@cue"]
 
 
-def gates_dot(g):
+def gates_dot(g, routes):
     """Parts named by layer, matrix and position: every query or key subcomponent whose removal moves the hidden word's
     raise (its log P relative to its mean within the template) by at least 10% (fourlayer/attention_gates.py); a part
-    of two subcomponents takes the larger effect.  Wire width grows with that change.
+    of two subcomponents takes the larger effect.  Wire width grows with that change.  The stages that carry the word
+    (fourlayer/mlp_routes.py, routes): each labeled with the share of the raise its word-specific output carries (the
+    output set to its mean over the template's words).
     Returns the dot source and the bundles' (label node, tail, head) for render(snap=...)."""
     eff = {k: 100 * v["raise_change_share"] for k, v in g["gates"].items()}
     missing = [k for k in DRAWN if k not in eff]
@@ -67,6 +69,9 @@ def gates_dot(g):
     part = f'style="rounded,filled", fillcolor="white", penwidth=2.2'
     head = f'style="rounded,filled,bold", fillcolor="{PALE_BLUE}", color="{BLUE}", fontcolor="{INK}", fontsize=40, penwidth=2.6'
 
+    share = lambda key: f"{-100 * routes['blocks'][key]['raise']:.0f}%"
+    biggest = max(-v["raise"] for v in routes["parts"].values())
+    stage = f'style="rounded,filled", fillcolor="white", color="{SLATE}", fontcolor="{INK}", penwidth=2.2'
     snap = []
 
     def bundle(a, b, label, k=10):
@@ -90,16 +95,25 @@ def gates_dot(g):
     q3 [label="layer 3 query\nwhere the word\nis recalled", color="{BLUE}", fontcolor="{BLUE}", {part}];
     b3 [label="layer 3 queries\nwhere the word\nis recalled\n(2 subcomponents)", color="{CORAL}", fontcolor="{CORAL}", {part}]; }}
   h3 [label="layer 3, heads 4 and 5\nread the later tokens\nwhere the word is recalled", {head}];
+  m0 [label="layer 0 MLP at the hidden word\nwrites the word's identity\n({share('0.mlp@word')} of recall; spread over many\nsubcomponents, none over {100 * biggest:.0f}% alone)", {stage}];
+  early [label="layers 0-1 attention and layer 0 MLP\nat the later tokens: an earlier copy\n({share('0.attn@later')}, {share('0.mlp@later')}, {share('1.attn@later')} of recall)", {stage}];
+  read2 [label="layer 2 attention\nwhere the word is recalled:\nan earlier read ({share('2.attn@cue')})", {stage}];
+  m3 [label="layer 3 MLP\nwhere the word is recalled\nturns it into the answer\n({share('3.mlp@cue')} of recall)", {stage}];
   answer [label="answer:\n“fox”", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=40];
-  word -> k2 [{info}]; later -> q2 [{info}]; later -> k3 [{info}]; cue -> q3 [{info}]; cue -> b3 [{info}];
-{bundle("word", "h2", "78 value\\nsubcomponents")}
+  word -> k2 [{info}]; word -> m0 [{info}]; later -> q2 [{info}]; later -> k3 [{info}]; cue -> q3 [{info}]; cue -> b3 [{info}];
+  word -> early [{info}];
+{bundle("m0", "h2", "78 value\\nsubcomponents")}
   k2 -> h2 [{need(E("h.2.attn.k_proj#224@word", "h.2.attn.k_proj#206@word"))}];
   q2 -> h2 [{need(E("h.2.attn.q_proj#436@later"))}];
 {bundle("h2", "h3", "the copied word:\\nmany output and\\nvalue subcomponents")}
   k3 -> h3 [{need(E("h.3.attn.k_proj#145@later", "h.3.attn.k_proj#507@later"))}];
   q3 -> h3 [{need(E("h.3.attn.q_proj#182@cue"))}];
   b3 -> h3 [{block(E("h.3.attn.q_proj#334@cue", "h.3.attn.q_proj#60@cue"))}];
-{bundle("h3", "answer", "many output\\nsubcomponents")}
+  early -> h3 [color="{SLATE}", penwidth=1.6, arrowsize=0.8];
+  early -> read2 [color="{SLATE}", penwidth=1.6, arrowsize=0.8];
+  read2 -> m3 [color="{SLATE}", penwidth=1.6, arrowsize=0.8];
+{bundle("h3", "m3", "many output\\nsubcomponents")}
+  m3 -> answer [color="{SLATE}", penwidth=2.2, arrowsize=0.9];
 }}
 """, snap
 
