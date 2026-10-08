@@ -1,15 +1,16 @@
-"""The main figure, four rows.
+"""The main figure (make_figure.sh), four rows.
   a-b  the experiment, and per model the share of other animals the hidden animal is ranked above at recall (each
        animal relative to its mean over runs; 50% = chance) in each condition; last column: the same three conditions in
-       plain text on Goodfire's 4-layer model
-  c-e  Qwen3-1.7B: layer 21 head 6 switched off across datasets, with other heads as controls; per hidden animal, each
-       question with the head and without it; each question alone and after Janus's LLM explainer (and Qwen3-0.6B)
-  f-g  the Qwen3-1.7B head circuit; the fewest VPD subcomponents of Goodfire's 4-layer model that raise recall
-  h    the 4-layer recall circuit (Graphviz, circuit_dot.py)
+       text on Goodfire's 4-layer model, each word relative to its mean within its template
+  c-e  Qwen3-1.7B: key-value head 21.6 switched off across datasets, with other heads as controls; per hidden animal,
+       each question with the head and without it (held-out runs); each question alone and after Janus's LLM explainer
+       (and Qwen3-0.6B)
+  f-g  the same with a CPU explainer of the same length and style between the two; the Qwen3-1.7B head circuit
+  h-i  Goodfire's 4-layer model: the fewest VPD subcomponents that make the hidden word the top answer; the attention
+       route of recall and the subcomponents that switch it (Graphviz, circuit_dot.py)
 Paired p-values: sign flips (t statistic) of each run's paired difference in the hidden animal's log P relative to
 that animal's mean over runs; p against chance: re-pairing hidden animals.
-usage: figure_main.py --results R.json ... --text4l T.json --flip figs/flip_rows.json --questions Q.npz[+Q2.npz]
-       --refit F.json ... --parts attention_gates.json
+usage: make_figure.sh
 """
 import argparse
 import json

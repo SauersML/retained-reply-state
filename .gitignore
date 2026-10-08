@@ -13,3 +13,6 @@ results/weights_scipy_done
 *_turn1.jsonl
 results/q17A/rerun2_done
 results/q17A/free_done
+results/fp32/*.done
+results/fp32/*.log
+results/fp32/*.out

@@ -13,8 +13,8 @@ lambda runs from large to small, each solution warm-starting the next; each solu
 every |s_i| <= 0.05 set to 0 (the edit that is saved and listed), and with --top-k cut to its K largest |s_i|.
 Layers 0-1 run once: layer 1's down_proj edit is added from its cached input, and only layers 2-3 run per step (layer 3
 at the last cue token only).
-Held out: the templates whose frame and middle were both unused in training, and edit_eval.py's Pile rows 2048-2063
-(training uses rows 0-63).  The hand-picked edits of edit_sweep.json are evaluated on the same split.
+Held out: the templates whose frame and middle were both unused in training, and Pile rows 2048-2063 (training uses
+rows 0-63).
 With --support PATH:INDEX --k K,...: for each K, a fresh fit in which only the K largest subcomponents of that saved
 edit may move (the fewest subcomponents that reach a given recall at a given cost).  With --ablate PATH:K, the saved
 refit of support K is evaluated whole and with each of its subcomponents left out.
@@ -56,7 +56,6 @@ def main():
     ap.add_argument("--templates", type=int, default=5, help="training templates per step (x 50 words)")
     ap.add_argument("--windows", type=int, default=8, help="training Pile windows (128 tokens) per step")
     ap.add_argument("--mlp1", action="store_true")
-    ap.add_argument("--hand", action="store_true", help="also evaluate the hand-picked edits of edit_sweep.json")
     ap.add_argument("--top-k", default="", help="also evaluate each solution cut to its K largest |s_i| (K,...)")
     ap.add_argument("--threads", type=int, default=8)
     ap.add_argument("--support", default="", help="PATH:INDEX: refit only the K largest subcomponents of that saved edit")
@@ -80,8 +79,7 @@ def main():
     sites = [n for n in names if n.split(".")[1] in ("2", "3") and n.split(".")[2] == "attn"]
     if a.mlp1:
         sites.append("h.1.mlp.down_proj")
-    hand = [k for k in json.load(open(os.path.join(RESULTS, "edit_sweep.json"))) if k != "unedited"] if a.hand else []
-    hooked = sorted(set(sites) | {p.split("#")[0] for spec in hand for p in spec.split(",")})
+    hooked = sorted(sites)
     U = {s: raw[f"_components.{s.replace('.', '-')}.U"].float().clone() for s in hooked}
     V = {s: raw[f"_components.{s.replace('.', '-')}.V"].float().clone() for s in hooked}
     del raw
@@ -193,15 +191,6 @@ def main():
     out = {"split": split, "args": vars(a), "sites": sites}
     out["unedited"] = evaluate(full=True)
     show("unedited", out["unedited"])
-    out["hand_picked"] = {}
-    for spec in hand:
-        DELTA.clear()
-        for part in spec.split(","):
-            sub, f = part.split(":")
-            site, idx = sub.split("#")
-            DELTA.setdefault(site, torch.zeros(U[site].shape[0]))[int(idx)] = float(f) - 1
-        out["hand_picked"][spec] = evaluate()
-        show(spec, out["hand_picked"][spec])
     DELTA.clear()
     json.dump(out, open(a.out, "w"), indent=1)
 
@@ -307,8 +296,6 @@ def main():
               f"all-48 top-1 {100 * r['all48_top1']:.1f}%  mean animal log P {r['mean_animal_logp']:.3f}", flush=True)
         out["frontier"] = frontier([{"kl": o["metrics"]["pile_kl"], "top1": o["metrics"]["top1"], "lambda": o["lambda"],
                                      "mu": o["mu"], "loss": a.loss, "n_subcomponents": o["n_moved"]} for o in out["optimized"]])
-        out["hand_picked_frontier"] = frontier([{"kl": r["pile_kl"], "top1": r["top1"], "edit": k}
-                                                for k, r in out["hand_picked"].items()])
         json.dump(out, open(a.out, "w"), indent=1)
 
 
