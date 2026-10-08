@@ -1,7 +1,7 @@
 """The main figure (make_figure.sh), four rows.
   a-b  the experiment, and per model the share of other animals the hidden animal is ranked above at recall (each
        animal relative to its mean over runs; 50% = chance) in each condition; last column: the same three conditions in
-       text on Goodfire's 4-layer model, each word relative to its mean within its template
+       text on Goodfire's 4-layer model, as the raise of the hidden word's log P within its template (nats)
   c-e  Qwen3-1.7B: key-value head 21.6 switched off across datasets, with other heads as controls; per hidden animal,
        each question with the head and without it (held-out runs); each question alone and after Janus's LLM explainer
        (and Qwen3-0.6B)
@@ -161,6 +161,33 @@ def strip_data(ax, data, lim, ticks, pvals):
     ax.set_xticks(range(len(data)), [])
 
 
+def strip_raise(ax, paths, arm, lim, ticks, pvals):
+    """Goodfire's 4-layer model: per hidden word, the raise of its log P relative to its mean within the template
+    (nats; blue), against the same with the hidden words re-paired at random (gray).  Within a template the runs differ
+    only in the hidden word, so the share of other words it is ranked above saturates near 100% for any consistent
+    raise; the raise itself shows how strong recall is."""
+    rng = np.random.default_rng(0)
+    for k, path in enumerate(paths):
+        L, c = pooled(path, arm, per_template=True)
+        present = np.unique(c)
+        raise_of = lambda lab: np.array([L[np.arange(len(c)), lab][c == a].mean() for a in present])
+        own = raise_of(c)
+        null = np.concatenate([raise_of(rng.permutation(present)[np.searchsorted(present, c)]) for _ in range(12)])
+        ax.scatter(k - 0.3 + rng.uniform(0, 0.24, null.size), null, s=10, color=CLOUD, alpha=0.9, edgecolor="none", zorder=2)
+        ax.scatter(k + 0.06 + rng.uniform(0, 0.22, own.size), own, s=60, color=BLUE, alpha=0.9, edgecolor="white",
+                   lw=0.6, zorder=3, clip_on=False)
+        ax.plot([k + 0.03, k + 0.31], [own.mean()] * 2, color=INK, lw=5, zorder=4, solid_capstyle="round")
+        if pvals:
+            nulls = np.array([raise_of(rng.permutation(present)[np.searchsorted(present, c)]).mean() for _ in range(10000)])
+            pv = (1 + np.sum(np.abs(nulls) >= abs(own.mean()))) / 10001
+            p_text(ax, k, lim[1] * 0.985, pv, own.mean())
+    ax.axhline(0, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=1)
+    ax.set_xlim(-0.55, len(paths) - 0.45)
+    ax.set_ylim(*lim)
+    ax.set_yticks(ticks)
+    ax.set_xticks(range(len(paths)), [])
+
+
 def row_experiment(cv, paths, y0, text4l=None, retained=None):
     """Rows a-b, occupying [y0, y0 + ROWS[0]]."""
     h = 1.15
@@ -210,18 +237,20 @@ def row_experiment(cv, paths, y0, text4l=None, retained=None):
     specs = {"stripped": ((18, 80), [30, 50, 70], False),
              "retained": ((14, 88), [30, 50, 70], True),
              "visible": ((0, 105), [0, 50, 100], False)}
-    specs4 = dict(specs, retained=((0, 130), [0, 50, 100], True))
+    specs4 = {"stripped": ((-1, 7.5), [0, 5], False), "retained": ((-1, 7.5), [0, 5], True), "visible": ((-1, 7.5), [0, 5], False)}
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
     arrows = {"stripped": (51, 78, BLUE, "toward"), "visible": (49, 6, CORAL, "away")}
     for (name, _), y in zip(rows, ys):
         if text4l:
-            ax4 = cv.axes(24.4, y - 0.55, 3.2, h + 1.1)
+            ax4 = cv.axes(24.6, y - 0.55, 3.0, h + 1.1)
             lim4, ticks4, pv4 = specs4[name]
-            strip(ax4, text4l, name, lim4, ticks4, pv4, per_template=True)
+            strip_raise(ax4, text4l, name, lim4, ticks4, pv4)
+            if name == "retained":
+                ax4.set_ylabel("hidden word's\nlog P raised (nats)", fontsize=17, labelpad=4)
             if name == "visible":
                 ax4.set_xticks(range(len(text4l)), [""] * len(text4l), fontsize=20)
                 ax4.set_xlabel("Goodfire 4-layer", fontsize=23, labelpad=6)
-        ax = cv.axes(16.2, y - 0.55, 7.4, h + 1.1)
+        ax = cv.axes(16.2, y - 0.55, 6.9, h + 1.1)
         lim, ticks, pv = specs[name]
         if name == "retained" and retained:          # float32 rescoring of the same runs (edit_heads.py)
             strip_data(ax, [saved_logp(spec, "none|retained") for spec in retained], lim, ticks, pv)
