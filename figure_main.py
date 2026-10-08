@@ -102,21 +102,28 @@ def saved_logp(spec, key):
     return (np.concatenate(Ls), np.concatenate(cs)) if Ls else (None, None)
 
 
-def pooled(spec, arm):
+def pooled(spec, arm, per_template=False):
     """Log-probabilities and hidden animals of one condition, pooled over independent sets of runs ("a.json+b.json").
     Each set is centered on its own mean per animal first, so the comparison stays within a set (sets computed on
-    different hardware differ by rounding)."""
+    different hardware differ by rounding).  per_template: the 4-layer model's runs come as templates, each with every
+    word hidden once in order; each word is then centered within its template (templates differ in their preferences
+    among the words far more than one hidden word moves them)."""
     Ls, cs = [], []
     for path in spec.split("+"):
         d = json.load(open(path))
         L = np.array(d["arms"][arm])
+        c = np.array([d["animals"].index(x) for x in d["chosen"]])
+        if per_template:
+            n = len(d["animals"])
+            assert (c == np.arange(len(c)) % n).all(), "runs are not templates of every word in order"
+            L = (L.reshape(-1, n, L.shape[1]) - L.reshape(-1, n, L.shape[1]).mean(1, keepdims=True)).reshape(L.shape)
         Ls.append(L - L.mean(0))
-        cs.append(np.array([d["animals"].index(x) for x in d["chosen"]]))
+        cs.append(c)
     return np.concatenate(Ls), np.concatenate(cs)
 
 
-def strip(ax, paths, arm, lim, ticks, pvals):
-    strip_data(ax, [pooled(p, arm) for p in paths], lim, ticks, pvals)
+def strip(ax, paths, arm, lim, ticks, pvals, per_template=False):
+    strip_data(ax, [pooled(p, arm, per_template) for p in paths], lim, ticks, pvals)
 
 
 def p_chance(L, c, own, rng, B=10000):
@@ -202,14 +209,14 @@ def row_experiment(cv, paths, y0, text4l=None):
     specs = {"stripped": ((18, 80), [30, 50, 70], False),
              "retained": ((18, 80), [30, 50, 70], True),
              "visible": ((0, 105), [0, 50, 100], False)}
-    specs4 = specs
+    specs4 = dict(specs, retained=((0, 130), [0, 50, 100], True))
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
     arrows = {"stripped": (51, 78, BLUE, "toward"), "visible": (49, 6, CORAL, "away")}
     for (name, _), y in zip(rows, ys):
         if text4l:
             ax4 = cv.axes(24.4, y - 0.55, 3.2, h + 1.1)
             lim4, ticks4, pv4 = specs4[name]
-            strip(ax4, text4l, name, lim4, ticks4, pv4)
+            strip(ax4, text4l, name, lim4, ticks4, pv4, per_template=True)
             if name == "visible":
                 ax4.set_xticks(range(len(text4l)), [""] * len(text4l), fontsize=20)
                 ax4.set_xlabel("Goodfire 4-layer", fontsize=23, labelpad=6)
@@ -361,15 +368,25 @@ def paired_legend(cv, x, y, left, right):
     cv.S.text(x2 + 0.25, y, right, fontsize=20, color=BLUE, va="center")
 
 
-def row_head(cv, y0, flip_groups, npz, with_cpu=False):
+def explainer_questions(npz):
+    """(npz, CPU npz, question arm, CPU arm, explainer arm, label) for each column of panels e and f."""
+    other = "results/q06A/q06A_questions.npz"
+    cpu, other_cpu = "results/q17A/q17A_cpu.npz+results/q17A/q17A_cpu_set2.npz", "results/q06A/q06A_cpu.npz"
+    qs = [(npz, cpu, "retained", "cpu_A", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"),
+          (npz, cpu, "recall_B", "cpu_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
+          (npz, cpu, "neutral", "cpu_neutral", "doc_neutral", "1.7B control:\n\u201cName one\nanimal\u2026\u201d"),
+          (other, other_cpu, "retained", "cpu_A", "doc_A", "0.6B:\n\u201cWhich\nanimal\u2026?\u201d")]
+    return [q for q in qs if saved_logp(q[0], f"none|{q[4]}")[0] is not None]
+
+
+def row_head(cv, y0, flip_groups, npz):
     """Panels c-e, Qwen3-1.7B, occupying [y0, y0 + ROWS[1]].
     c: layer 21 head 6 switched off on several datasets, other heads as controls (edit_heads.py)
     d: per hidden animal, each question, original model and head 21.6 switched off (edit_heads.py --save-logp)
-    e: per hidden animal, each question alone and after Janus's LLM explainer; with_cpu: also after a CPU explainer of
-       the same length and style, between the two (edit_heads.py --question)"""
+    e: per hidden animal, each question alone and after Janus's LLM explainer (edit_heads.py --question)"""
     top = y0 + ROWS[1]
     cv.letter(0.1, top - 0.75, "c")
-    cv.S.text(0.9, top - 0.75, "Qwen3-1.7B: switching off one key-value\nhead (layer 21, head 6) raises\nintrospection, across datasets",
+    cv.S.text(0.9, top - 0.75, "Qwen3-1.7B: switching off head 21.6\n(layer 21, key-value head 6)\nraises introspection on all data",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     cv.S.scatter([1.1], [top - 2.35], s=110, color=SLATE)
     cv.S.text(1.35, top - 2.35, "original model", fontsize=20, color=SLATE, va="center")
@@ -394,40 +411,20 @@ def row_head(cv, y0, flip_groups, npz, with_cpu=False):
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
 
     cv.letter(19.0, top - 0.75, "e")
-    other = "results/q06A/q06A_questions.npz"
-    cpu, other_cpu = "results/q17A/q17A_cpu.npz+results/q17A/q17A_cpu_set2.npz", "results/q06A/q06A_cpu.npz"
-    qs = [(npz, cpu, "retained", "cpu_A", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"),
-          (npz, cpu, "recall_B", "cpu_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
-          (npz, cpu, "neutral", "cpu_neutral", "doc_neutral", "1.7B control:\n\u201cName one\nanimal\u2026\u201d"),
-          (other, other_cpu, "retained", "cpu_A", "doc_A", "0.6B:\n\u201cWhich\nanimal\u2026?\u201d")]
-    qs = [q for q in qs if saved_logp(q[0], f"none|{q[4]}")[0] is not None]
+    qs = explainer_questions(npz)
     ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.5)
-    if with_cpu:
-        cv.S.text(19.8, top - 0.75, "Qwen3-1.7B: a CPU explainer in the same\nstyle raises recall as much as Janus's;\nQwen3-0.6B: both lower it, Janus's less",
-                  fontsize=25, weight="bold", va="center", linespacing=1.15)
-        for i, (col, lab) in enumerate(((SLATE, "question alone"), (GOLD, "CPU explainer (same length, style) first"),
-                                        (BLUE, "Janus's LLM explainer first"))):
-            x = 20.0 + (0, 2.85, 0)[i]
-            y = top - 2.05 - (0, 0, 0.5)[i]
-            cv.S.scatter([x], [y], s=110, color=col)
-            cv.S.text(x + 0.25, y, lab, fontsize=19, color=col, va="center")
-        qs = [q for q in qs if saved_logp(q[1], f"none|{q[3]}")[0] is not None]
-        panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
-                           saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (5, 120))
-        ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
-    else:
-        cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the question:\nraises recall of the hidden animal in\nQwen3-1.7B, lowers it in Qwen3-0.6B",
-                  fontsize=25, weight="bold", va="center", linespacing=1.15)
-        paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
-        panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{qd}")[0], saved_logp(sp, f"none|{q0}")[1])
-                          for sp, _, q0, _, qd, _ in qs], (5, 102))
-        ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
+    cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the\nquestion: up in Qwen3-1.7B,\ndown in Qwen3-0.6B",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
+    panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{qd}")[0], saved_logp(sp, f"none|{q0}")[1])
+                      for sp, _, q0, _, qd, _ in qs], (5, 102))
+    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
     cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, 5.5))
     cb.set_ticks([-1, 0, 1], labels=["½×", "1×", "2×"])
-    cb.set_label("change per line (d, e)", fontsize=16, labelpad=2)
+    cb.set_label("change per line (d-f)", fontsize=16, labelpad=2)
     cb.ax.tick_params(labelsize=17)
     cb.outline.set_visible(False)
 
@@ -437,61 +434,81 @@ SITES = [("h.1.mlp.down_proj", "layer 1\nMLP out"), ("h.2.attn.q_proj", "layer 2
          ("h.3.attn.k_proj", "layer 3\nkey"), ("h.3.attn.v_proj", "layer 3\nvalue"), ("h.3.attn.o_proj", "layer 3\noutput")]
 
 
-def row_fourlayer(cv, refits, y0):
+def row_controls(cv, y0, npz):
     """Panels f-g, occupying [y0, y0 + ROWS[2]].
-    f: the Qwen3-1.7B circuit of two layer-21 heads (edit_heads.py, attention.py), drawn by Graphviz (circuit_dot.py).
-    g: Goodfire's 4-layer model, the fewest VPD subcomponents that raise recall: for each K, the scales of only the K
-       largest subcomponents of a fitted edit fitted again on the training templates; recall on held-out templates against
-       K, colored by KL on held-out Pile text (fourlayer/optimize_edit.py --support)."""
+    f: per hidden animal, each question alone, after a CPU explainer of the same length and style, and after Janus's LLM
+       explainer; brackets: paired p of each against the one to its left (edit_heads.py --question).
+    g: the Qwen3-1.7B circuit of two layer-21 key-value heads (edit_heads.py, weights.py, attention_runs.py), drawn by
+       Graphviz (circuit_dot.py)."""
     import circuit_dot
     top = y0 + ROWS[2]
+    qs = [q for q in explainer_questions(npz) if saved_logp(q[1], f"none|{q[3]}")[0] is not None]
     cv.letter(0.1, top - 0.75, "f")
-    cv.S.text(0.9, top - 0.75, "Qwen3-1.7B: the circuit at the level of attention heads", fontsize=25, weight="bold", va="center")
-    image(cv, circuit_dot.render(circuit_dot.qwen_dot(), "figs/circuit_qwen"), 0.6, top - 1.7, 11.6, 9.0, middle=True)
+    cv.S.text(0.9, top - 0.75, "control: a CPU explainer of the same length", fontsize=25, weight="bold", va="center",
+              linespacing=1.15)
+    for x, col, lab in ((1.1, SLATE, "question alone"), (4.1, GOLD, "CPU explainer first"), (7.6, BLUE, "Janus's LLM explainer first")):
+        cv.S.scatter([x], [top - 2.0], s=110, color=col)
+        cv.S.text(x + 0.25, top - 2.0, lab, fontsize=19, color=col, va="center")
+    ax = cv.axes(2.0, y0 + 1.75, 9.6, 6.3)
+    panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
+                       saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (5, 120))
+    ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab.replace("\n", " ", 1) for *_, lab in qs], fontsize=17)
+    ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
+    ax.tick_params(axis="x", length=0)
+    ax.set_yticks([10, 30, 50, 70, 90])
 
+    cv.letter(14.6, top - 0.75, "g")
+    cv.S.text(15.4, top - 0.75, "Qwen3-1.7B: the head circuit", fontsize=25, weight="bold", va="center")
+    image(cv, circuit_dot.render(circuit_dot.qwen_dot(), "figs/circuit_qwen"), 14.8, top - 1.7, 12.8, 9.0, middle=True)
+
+
+def row_fourlayer(cv, refits, parts, y0):
+    """Panels h-i, occupying [y0, y0 + ROWS[3]].
+    h: Goodfire's 4-layer model, the fewest VPD subcomponents that make the hidden word the top answer: for each K, the
+       scales of only the K largest subcomponents of a fitted edit fitted again on the training templates; on held-out
+       templates, how often the hidden word is the model's first choice among the 50 words, against K, colored by KL on
+       held-out Pile text (fourlayer/optimize_edit.py --support).
+    i: the recall circuit, two attention steps and the VPD subcomponents measured to switch them on or off
+       (fourlayer/attention_gates.py, subcomponent_circuit.py), drawn by Graphviz."""
+    import circuit_dot
+    top = y0 + ROWS[3]
     rows = sorted((o["support_k"], o["metrics"]) for path in refits if os.path.exists(path)
                   for o in json.load(open(path)).get("optimized", []))
-    base = 100 * json.load(open(refits[0]))["unedited"]["discrimination"]
-    cv.letter(13.4, top - 0.75, "g")
-    cv.S.text(14.2, top - 0.75, "Goodfire 4-layer model: rescaling about 50 VPD subcomponents\n(rank-one parts of the weights) raises recall from 64% to 97%",
+    base = 100 * json.load(open(refits[0]))["unedited"]["top1"]
+    cv.letter(0.1, top - 0.75, "h")
+    cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: rescaling\n50 VPD subcomponents makes the\nhidden word the top answer",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(16.0, y0 + 1.7, 8.6, 6.9)
+    ax = cv.axes(2.4, y0 + 1.6, 5.4, 6.2)
     ks = [k for k, _ in rows]
-    ds = [100 * m["discrimination"] for _, m in rows]
+    t1 = [100 * m["top1"] for _, m in rows]
     kl = np.array([m["pile_kl"] for _, m in rows])
-    ax.plot(ks, ds, "-", color=CLOUD, lw=2.5, zorder=2)
-    sc = ax.scatter(ks, ds, c=kl, cmap=LinearSegmentedColormap.from_list("kl", ["#d6e4f5", BLUE, INK]),
-                    vmin=0, vmax=max(0.05, float(kl.max())), s=260, edgecolor="white", lw=1.5, zorder=3)
-    cb = cv.fig.colorbar(sc, cax=cv.axes(25.0, y0 + 1.7, 0.25, 6.9))
-    cb.set_label("damage on held-out Pile text\n(KL, nats per token)", fontsize=20)
-    cb.ax.tick_params(labelsize=18)
+    ax.plot(ks, t1, "-", color=CLOUD, lw=2.5, zorder=2)
+    sc = ax.scatter(ks, t1, c=kl, cmap=LinearSegmentedColormap.from_list("kl", ["#d6e4f5", BLUE, INK]),
+                    vmin=0, vmax=max(0.05, float(kl.max())), s=200, edgecolor="white", lw=1.5, zorder=3)
+    cb = cv.fig.colorbar(sc, cax=cv.axes(8.2, y0 + 1.6, 0.22, 6.2))
+    cb.set_label("damage on held-out Pile text\n(KL, nats per token)", fontsize=17)
+    cb.ax.tick_params(labelsize=15)
     cb.outline.set_visible(False)
     ax.axhline(base, color=INK, lw=2, ls=(0, (2, 2)))
-    ax.text(300, base + 1.0, f"unedited: {base:.0f}%", fontsize=18, color=INK, va="bottom", ha="center")
-    ax.axhline(50, color=SLATE, lw=1.5, ls=(0, (4, 3)))
+    ax.text(30, base + 1.5, f"unedited: {base:.0f}%", fontsize=17, color=INK, va="bottom", ha="center")
     ax.set_xscale("log")
     ax.set_xticks([1, 10, 100, 1000], ["1", "10", "100", "1,000"])
-    ax.set_ylim(45, 102)
-    ax.set_xlabel("number of subcomponents rescaled (of 9,728 searched)")
-    ax.set_ylabel("hidden word ranked above\nanother word (%)\non held-out sentences")
+    ax.set_ylim(0, 55)
+    ax.set_xlabel("subcomponents rescaled\n(of 9,728 searched)")
+    ax.set_ylabel("hidden word is the top answer\namong 50 words (%),\nheld-out sentences")
 
-
-def row_circuit(cv, parts, y0):
-    """Panel h, occupying [y0, y0 + ROWS[3]]: the 4-layer recall circuit, two attention steps and the VPD subcomponents
-    measured to switch them on or off (fourlayer/attention_gates.py, subcomponent_circuit.py), drawn by Graphviz."""
-    import circuit_dot
     if not parts or not os.path.exists(parts):
         return
-    top = y0 + ROWS[3]
     g = json.load(open(parts))
     screen = os.path.join(os.path.dirname(parts), "subcomponent_circuit.json")
     if os.path.exists(screen):
         g["screen"] = json.load(open(screen))["single"]
-    cv.letter(0.1, top - 0.75, "h")
-    cv.S.text(0.9, top - 0.75, "Goodfire 4-layer model: the recall circuit, two attention steps switched on and off by a few VPD subcomponents",
-              fontsize=25, weight="bold", va="center")
-    key(cv, 1.2, top - 1.75)
-    image(cv, circuit_dot.render(*circuit_dot.gates_dot(g)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g)[1]), 0.6, top - 2.6, 26.8, 9.6, middle=True)
+    cv.letter(10.4, top - 0.75, "i")
+    cv.S.text(11.2, top - 0.75, "Goodfire 4-layer model: the recall circuit",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    key(cv, 11.4, top - 2.3)
+    image(cv, circuit_dot.render(*circuit_dot.gates_dot(g)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g)[1]),
+          10.6, top - 3.1, 17.2, 9.1, middle=True)
 
 
 def key(cv, x, y):
@@ -540,14 +557,13 @@ def main():
     ap.add_argument("--refit", nargs="+", required=True, help="fourlayer/optimize_edit.py --support outputs")
     ap.add_argument("--parts", default=None, help="fourlayer/attention_gates.py output")
     ap.add_argument("--out", default="figs/main.png")
-    ap.add_argument("--cpu", action="store_true", help="panel e: add the CPU-explainer control between the two conditions")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1] + ROWS[2] + ROWS[3], a.text4l)
-    row_head(cv, ROWS[2] + ROWS[3], json.load(open(a.flip)), a.questions, a.cpu)
-    row_fourlayer(cv, a.refit, ROWS[3])
-    row_circuit(cv, a.parts, 0)
+    row_head(cv, ROWS[2] + ROWS[3], json.load(open(a.flip)), a.questions)
+    row_controls(cv, ROWS[3], a.questions)
+    row_fourlayer(cv, a.refit, a.parts, 0)
     fig.savefig(a.out, dpi=100)
 
 

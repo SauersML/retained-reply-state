@@ -74,7 +74,7 @@ def gates_dot(g):
   rankdir=LR; splines=spline; nodesep=0.3; ranksep=0.45; bgcolor="white"; pad=0.1;
   node [shape=box, fontname="{FONT}", fontsize=30, margin="0.18,0.1"];
   edge [fontname="{FONT}", fontsize=26, fontcolor="{SLATE}"];
-  {{ rank=same; word [label="hidden word\n“otter”", {token}]; later [label="later tokens\n“. Nobody else knows.”", {token}];
+  {{ rank=same; word [label="hidden word\n“fox”", {token}]; later [label="later tokens\n“. Nobody else knows.”", {token}];
     cue [label="where the word is recalled\n“My pet is a”", {token}]; }}
   {{ rank=same; k2 [label="layer 2 keys\nat the hidden word\n(2 subcomponents)", color="{BLUE}", fontcolor="{BLUE}", {part}];
     q2 [label="layer 2 query\nat the later tokens", color="{BLUE}", fontcolor="{BLUE}", {part}]; }}
@@ -83,7 +83,7 @@ def gates_dot(g):
     q3 [label="layer 3 query\nwhere the word\nis recalled", color="{BLUE}", fontcolor="{BLUE}", {part}];
     b3 [label="layer 3 queries\nwhere the word\nis recalled\n(2 subcomponents)", color="{CORAL}", fontcolor="{CORAL}", {part}]; }}
   h3 [label="layer 3, heads 4 and 5\nread the later tokens\nwhere the word is recalled", {head}];
-  answer [label="answer:\n“otter”", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=33];
+  answer [label="answer:\n“fox”", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=33];
   word -> k2 [{info}]; later -> q2 [{info}]; later -> k3 [{info}]; cue -> q3 [{info}]; cue -> b3 [{info}];
 {bundle("word", "h2", "78 value\\nsubcomponents")}
   k2 -> h2 [{need(E("h.2.attn.k_proj#224@word", "h.2.attn.k_proj#206@word"))}];

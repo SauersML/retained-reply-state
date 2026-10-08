@@ -6,7 +6,11 @@ edit, on a hidden_choice.py result's runs and thinking texts:
   discrimination  share of other animals the hidden animal is ranked above, each animal relative to its mean over runs
                   (50% = chance; below 50% the answer points away from the hidden animal); two-sided permutation p
   top-1, mean rank of the hidden animal; the own-animal raise (nats)
-  damage          KL from the unedited model's next-token distributions on held-out web text (nats per token)
+  damage          KL(unedited || edited) of the next-token distributions on held-out web text (nats per token), over
+                  --web-windows windows of 512 tokens spread evenly through WINDOWS.u32
+Everything is computed in --dtype (float32 by default: in bfloat16 the logits alone are rounded to 1/8 nat near the
+answer's scale, as large as the run-to-run signal).  The output records the result file, the windows, and every
+question's text.
 With --turn1-drop, turn 1 is recomputed without one sentence of its instruction, over the same thinking texts.
 With --question NAME=TEXT, further turn-2 questions are asked over the same caches.
 usage: edit_heads.py RESULT.json WINDOWS.u32 --edits "21:0*4;21:5*0,21:6*0;..." --out OUT.json
@@ -36,6 +40,8 @@ def main():
                     help="NAME=TEXT: also ask this turn-2 question over the same caches, reported as arm NAME")
     ap.add_argument("--arms", default="retained", help="retained, neutral (any-animal question), visible (thinking kept)")
     ap.add_argument("--batch", type=int, default=16)
+    ap.add_argument("--dtype", default="float32", choices=["float32", "bfloat16"])
+    ap.add_argument("--web-windows", type=int, default=64)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--out", required=True)
     ap.add_argument("--save-logp", action="store_true",
@@ -51,7 +57,7 @@ def main():
         assert a.turn1_drop in TURN1, "the sentence to drop is not in turn 1"
         TURN1 = TURN1.replace(a.turn1_drop, "")
     tok = AutoTokenizer.from_pretrained(d["model"])
-    model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=torch.bfloat16, device_map=a.device,
+    model = AutoModelForCausalLM.from_pretrained(d["model"], dtype=getattr(torch, a.dtype), device_map=a.device,
                                                  attn_implementation="sdpa").eval()
     cfg = model.config
     hd = getattr(cfg, "head_dim", None) or cfg.hidden_size // cfg.num_attention_heads
@@ -79,31 +85,44 @@ def main():
     chosen = np.array([ANIMALS.index(x) for x in d["chosen"]])[: a.max_runs]
     thinks = [tok.encode("<think>\n" + th + "\n</think>\n\n", add_special_tokens=False) for th in d["thinking"][: a.max_runs]]
     n = len(chosen)
-    web = torch.from_numpy(np.fromfile(a.windows, dtype=np.uint32).reshape(-1, 512)[:4].astype(np.int64))
+    all_windows = np.fromfile(a.windows, dtype=np.uint32).reshape(-1, 512)
+    widx = np.linspace(0, len(all_windows) - 1, a.web_windows).round().astype(int)
+    web = torch.from_numpy(all_windows[widx].astype(np.int64))
     original = {l: model.model.layers[l].self_attn.o_proj.weight.detach().clone() for l in range(cfg.num_hidden_layers)}
 
-    def web_logp():
-        """Next-token log-probabilities on the web windows, one window at a time, kept in bfloat16."""
-        return [torch.log_softmax(model(web[s:s + 1].to(a.device)).logits.float(), -1).to("cpu", torch.bfloat16)
-                for s in range(len(web))]
+    def set_edit(spec):
+        for l, W in original.items():
+            model.model.layers[l].self_attn.o_proj.weight.copy_(W)
+        if spec != "none":
+            for part in spec.split(","):
+                lh, scale = part.split("*")
+                l, h = (int(x) for x in lh.split(":"))
+                W = model.model.layers[l].self_attn.o_proj.weight
+                W[:, h * group * hd:(h + 1) * group * hd] *= float(scale)
 
-    def web_kl(lp):
-        return float(np.mean([(b.float().exp() * (b.float() - x.float())).sum(-1).mean().item() for b, x in zip(base_web, lp)]))
+    def web_kl(spec):
+        """KL(unedited || edited) per token, window by window (the unedited distributions are recomputed per window
+        rather than stored: 64 windows of 512 tokens over a 151,936-word vocabulary would take 20 GB)."""
+        if spec == "none":
+            return 0.0
+        kls = []
+        for s in range(len(web)):
+            x = web[s:s + 1].to(a.device)
+            set_edit("none")
+            b = torch.log_softmax(model(x).logits.float(), -1)
+            set_edit(spec)
+            e = torch.log_softmax(model(x).logits.float(), -1)
+            kls.append((b.exp() * (b - e)).sum(-1).mean().item())
+        return float(np.mean(kls))
 
     rng = np.random.default_rng(0)
-    res = {"model": d["model"], "runs": n, "turn1_drop": a.turn1_drop, "edits": {}}
+    res = {"model": d["model"], "result": a.result, "runs": n, "dtype": a.dtype, "turn1_drop": a.turn1_drop,
+           "recall": RECALL, "neutral": NEUTRAL, "questions": dict(q.split("=", 1) for q in a.question),
+           "windows": a.windows, "web_windows": widx.tolist(), "edits": {}}
     saved = {}
     with torch.no_grad():
-        base_web = web_logp()
         for spec in ["none"] + [e for e in a.edits.split(";") if e]:
-            for l, W in original.items():
-                model.model.layers[l].self_attn.o_proj.weight.copy_(W)
-            if spec != "none":
-                for part in spec.split(","):
-                    lh, scale = part.split("*")
-                    l, h = (int(x) for x in lh.split(":"))
-                    W = model.model.layers[l].self_attn.o_proj.weight
-                    W[:, h * group * hd:(h + 1) * group * hd] *= float(scale)
+            set_edit(spec)
             clean = layers_of(model(torch.tensor([prompt], device=a.device), use_cache=True).past_key_values)
             prompt_kv = [(k.cpu(), v.cpu()) for k, v in clean]
             arms = a.arms.split(",") + [q.split("=", 1)[0] for q in a.question]
@@ -135,7 +154,7 @@ def main():
                 rank = (L > L[np.arange(n), chosen][:, None]).sum(1) + 1
                 r[arm] = {"discrimination": float(acc), "p": pv, "top1": float(np.mean(rank == 1)),
                           "mean_rank": float(rank.mean()), "raise": float(raises(L, chosen).mean())}
-            kl = web_kl(web_logp())
+            kl = web_kl(spec)
             r["web_kl"] = kl
             res["edits"][spec] = r
             print(f"{spec:28s} " + "  ".join(f"{arm}: {100 * r[arm]['discrimination']:5.1f}% (p {r[arm]['p']:.2g}, top-1 "

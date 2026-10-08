@@ -24,7 +24,7 @@ digraph G {
 			fontcolor="#1d1d1f",
 			height=1.3458,
 			label="hidden word
-“otter”",
+“fox”",
 			pos="192.59,661.7",
 			style="rounded,filled",
 			width=2.7767];
@@ -295,7 +295,7 @@ where the word is recalled",
 		fontsize=33,
 		height=1.4708,
 		label="answer:
-“otter”",
+“fox”",
 		pos="2137.1,661.7",
 		style="rounded,filled,bold",
 		width=1.985];

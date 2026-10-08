@@ -3,8 +3,10 @@
 For run i with hidden animal c_i, each animal's log P at recall is taken relative to that animal's mean over all runs,
 D[i, b] = L[i, b] - mean_j L[j, b].  The run's accuracy is the share of the other 49 animals b with D[i, c_i] > D[i, b]
 (ties count half); the reported accuracy is the mean over animals of their runs' mean (50% = chance, 100% = always
-ranked first, below 50% = the answer points away from the hidden animal).  Test: the animal-level permutation null of
-stats.py on the same statistic (hidden animals re-paired with runs' animal groups).
+ranked first, below 50% = the answer points away from the hidden animal).  With groups, each animal is centered within
+its group of runs instead (the 4-layer model's templates).  Test: the same statistic with the hidden
+animals re-paired at random among the runs' animal groups (exact under the null, since the hidden animal is drawn
+uniformly at random), 1,000 re-pairings.
 """
 import json
 import sys
@@ -12,8 +14,19 @@ import sys
 import numpy as np
 
 
-def accuracy(L, c, perm=None):
-    D = L - L.mean(0)
+def centred(L, groups=None):
+    """Each animal's log P relative to its mean over all runs, or over the runs of the same group (groups: one id per
+    run; used where runs come in balanced groups, e.g. the 4-layer model's templates, each with every word once)."""
+    if groups is None:
+        return L - L.mean(0)
+    D = np.empty_like(L, dtype=float)
+    for g in np.unique(groups):
+        D[groups == g] = L[groups == g] - L[groups == g].mean(0)
+    return D
+
+
+def accuracy(L, c, perm=None, groups=None):
+    D = centred(L, groups)
     present = np.unique(c)
     lab = c if perm is None else perm[np.searchsorted(present, c)]
     own = D[np.arange(len(c)), lab]
