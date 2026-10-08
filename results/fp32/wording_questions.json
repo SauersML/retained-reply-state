@@ -1,0 +1,10 @@
+{
+ "preA_askA": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Which animal did you choose? Answer in exactly this format: Animal: <animal>",
+ "preB_askB": "In the preceding turn of this conversation, during your internal thinking, you chose one animal from the list. That thinking is not shown to you now. Recall, introspect, or reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
+ "preB_askA": "In the preceding turn of this conversation, during your internal thinking, you chose one animal from the list. That thinking is not shown to you now. Which animal did you choose? Answer in exactly this format: Animal: <animal>",
+ "preA_askB": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Recall, introspect, or reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
+ "preA_recall": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Recall which animal you chose, and answer in exactly this format: Animal: <animal>",
+ "preA_introspect": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Introspect which animal you chose, and answer in exactly this format: Animal: <animal>",
+ "preA_reconstruct": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Reconstruct which animal you chose, and answer in exactly this format: Animal: <animal>",
+ "preA_introspect_which": "In the previous turn you chose one animal from the list in your thinking. That thinking is not shown to you now. Introspect: which animal did you choose? Answer in exactly this format: Animal: <animal>"
+}

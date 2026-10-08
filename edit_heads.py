@@ -38,6 +38,7 @@ def main():
     ap.add_argument("--turn1-drop", default=None, help="remove this sentence from turn 1 (the thinking texts are kept)")
     ap.add_argument("--question", action="append", default=[],
                     help="NAME=TEXT: also ask this turn-2 question over the same caches, reported as arm NAME")
+    ap.add_argument("--questions-file", default=None, help="JSON object NAME -> TEXT of further turn-2 questions")
     ap.add_argument("--arms", default="retained", help="retained, neutral (any-animal question), visible (thinking kept)")
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--dtype", default="float32", choices=["float32", "bfloat16"])
@@ -47,6 +48,8 @@ def main():
     ap.add_argument("--save-logp", action="store_true",
                     help="also save every run's log P of the 50 names per edit and arm (OUT with .npz), for per-animal plots")
     a = ap.parse_args()
+    if a.questions_file:
+        a.question += [f"{k}={v}" for k, v in json.load(open(a.questions_file)).items()]
     d = json.load(open(a.result))
     T = task_of(d)
     TURN1, RECALL, NEUTRAL, ANIMALS = T["turn1"], T["recall"], T["neutral"], T["items"]

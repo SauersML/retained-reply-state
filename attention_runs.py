@@ -4,6 +4,8 @@ For every run of a hidden_choice.py result: turn 1 (prompt, the run's thinking, 
 is removed and the reply's keys are re-rotated to close the gap, and then each turn-2 question is asked over that same
 cache.  Saved per run, per question and per query head of the chosen layers: the attention mass from the last position
 before the answer to the four reply tokens.  Two questions over the same cache give a paired comparison per run.
+--question NAME=TEXT adds any turn-2 question (e.g. a document before the recall question); --questions-file takes
+NAME=TEXT pairs from a JSON object.
 usage: attention_runs.py RESULT.json --questions A,B --layers 21 --out OUT.npz
 """
 import argparse
@@ -21,6 +23,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("result")
     ap.add_argument("--questions", default="A,B", help="recall wordings to ask, comma separated")
+    ap.add_argument("--question", action="append", default=[], help="NAME=TEXT: a further turn-2 question")
+    ap.add_argument("--questions-file", default=None, help="JSON object NAME -> TEXT of further turn-2 questions")
     ap.add_argument("--layers", default="21")
     ap.add_argument("--max-runs", type=int, default=600)
     ap.add_argument("--device", default="mps")
@@ -40,10 +44,14 @@ def main():
     reply = tok.encode("I understand.<|im_end|>", add_special_tokens=False)
     P, R = len(prompt), len(reply)
     answer = tok.encode(f"<think>\n\n</think>\n\n{T['label']}:", add_special_tokens=False)
+    texts = {w: task(w, d.get("items", "animals"))["recall"] for w in a.questions.split(",") if w}
+    texts.update(dict(q.split("=", 1) for q in a.question))
+    if a.questions_file:
+        texts.update(json.load(open(a.questions_file)))
     suffixes = {}
-    for w in a.questions.split(","):
+    for w, text in texts.items():
         full = chat([{"role": "user", "content": T["turn1"]}, {"role": "assistant", "content": "I understand."},
-                     {"role": "user", "content": task(w, d.get("items", "animals"))["recall"]}])
+                     {"role": "user", "content": text}])
         assert full[:P + R] == prompt + reply
         suffixes[w] = full[P + R:] + answer
     n = min(a.max_runs, len(d["chosen"]))
