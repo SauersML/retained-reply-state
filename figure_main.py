@@ -3,10 +3,11 @@
        animal relative to its mean over runs; 50% = chance) in each condition; last column: the same three conditions in
        text on Goodfire's 4-layer model, as the raise of the hidden word's log P within its template (nats)
   c-e  Qwen3-1.7B: key-value head 21.6 switched off across datasets, with other heads as controls; per hidden animal,
-       each question with the head and without it (held-out runs); each question alone and after Janus's LLM explainer
-       (and Qwen3-0.6B)
-  f-g  the same with a CPU explainer of the same length and style between the two; the Qwen3-1.7B head circuit
-  h-i  Goodfire's 4-layer model: the fewest VPD subcomponents that make the hidden word the top answer; the attention
+       each question with the head and without it (held-out runs); the recall question without and with introspective
+       wording (Qwen3-1.7B, Qwen3-0.6B, and Qwen3-1.7B with head 21.6 switched off)
+  f-h  each question alone and after Janus's LLM explainer (Qwen3-1.7B and 0.6B); the same with a CPU explainer of the
+       same length and style between the two; the Qwen3-1.7B head circuit
+  i-j  Goodfire's 4-layer model: the fewest VPD subcomponents that make the hidden word the top answer; the attention
        route of recall and the subcomponents that switch it (Graphviz, circuit_dot.py)
 Paired p-values: sign flips (t statistic) of each run's paired difference in the hidden animal's log P relative to
 that animal's mean over runs; p against chance: re-pairing hidden animals.
@@ -36,7 +37,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [14.5, 11.5, 11.0, 12.5]            # heights of the four rows
+ROWS = [14.5, 11.5, 11.5, 12.5]            # heights of the four rows
 H = sum(ROWS)
 
 
@@ -422,7 +423,8 @@ def row_head(cv, y0, flip_groups, npz, other):
     """Panels c-e, Qwen3-1.7B, occupying [y0, y0 + ROWS[1]].
     c: layer 21 head 6 switched off on several datasets, other heads as controls (edit_heads.py)
     d: per hidden animal, each question, original model and head 21.6 switched off (edit_heads.py --save-logp)
-    e: per hidden animal, each question alone and after Janus's LLM explainer (edit_heads.py --question)"""
+    e: per hidden animal, the recall question without and with introspective wording, in Qwen3-1.7B, Qwen3-0.6B and
+       Qwen3-1.7B with head 21.6 switched off (held-out runs) (edit_heads.py --question)"""
     top = y0 + ROWS[1]
     cv.letter(0.1, top - 0.75, "c")
     cv.S.text(0.9, top - 0.75, "Qwen3-1.7B: switching off head 21.6\n(layer 21, key-value head 6)\nraises introspection on all data",
@@ -451,20 +453,24 @@ def row_head(cv, y0, flip_groups, npz, other):
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
 
     cv.letter(19.0, top - 0.75, "e")
-    qs = explainer_questions(npz, other)
-    ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.5)
-    cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the\nquestion: up in Qwen3-1.7B,\ndown in Qwen3-0.6B",
+    cv.S.text(19.8, top - 0.75, "introspective wording in the\nquestion raises introspection,\nthrough head 21.6",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
-    panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{qd}")[0], saved_logp(sp, f"none|{q0}")[1])
-                      for sp, _, q0, _, qd, _ in qs], (0, 102))
-    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=17)
+    for yy, col, lab in ((top - 2.05, SLATE, "\u201cWhich animal did you choose?\u201d"),
+                         (top - 2.6, BLUE, "\u201cRecall, introspect, or reconstruct which animal you chose\u201d")):
+        cv.S.scatter([20.0], [yy], s=110, color=col)
+        cv.S.text(20.25, yy, lab, fontsize=17, color=col, va="center")
+    held = npz.split("+")[0]
+    groups = [(npz, "none", "Qwen3-1.7B"), (other, "none", "Qwen3-0.6B"), (held, "21:6*0", "Qwen3-1.7B,\nhead 21.6\nswitched off")]
+    ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.2)
+    panel_paired(ax, [(saved_logp(sp, f"{e}|retained")[0], saved_logp(sp, f"{e}|recall_B")[0], saved_logp(sp, f"{e}|retained")[1])
+                      for sp, e, _ in groups], (5, 102))
+    ax.set_xticks([3 * k + 0.6 for k in range(len(groups))], [lab for *_, lab in groups], fontsize=18)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
-    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, 5.5))
+    cb = cv.fig.colorbar(matplotlib.cm.ScalarMappable(norm=FC_NORM, cmap=FC_CMAP), cax=cv.axes(26.8, y0 + 2.6, 0.2, 5.2))
     cb.set_ticks([-1, 0, 1], labels=["½×", "1×", "2×"])
-    cb.set_label("change per line (d-f)", fontsize=16, labelpad=2)
+    cb.set_label("change per line (d-g)", fontsize=16, labelpad=2)
     cb.ax.tick_params(labelsize=17)
     cb.outline.set_visible(False)
 
@@ -475,40 +481,56 @@ SITES = [("h.1.mlp.down_proj", "layer 1\nMLP out"), ("h.2.attn.q_proj", "layer 2
 
 
 def row_controls(cv, y0, npz, other):
-    """Panels f-g, occupying [y0, y0 + ROWS[2]].
-    f: per hidden animal, each question alone, after a CPU explainer of the same length and style, and after Janus's LLM
-       explainer; brackets: paired p of each against the one to its left (edit_heads.py --question).
-    g: the Qwen3-1.7B circuit of two layer-21 key-value heads (edit_heads.py, weights.py, attention_runs.py), drawn by
+    """Panels f-h, occupying [y0, y0 + ROWS[2]].
+    f: per hidden animal, each question alone and after Janus's LLM explainer (edit_heads.py --question).
+    g: the same with a CPU explainer of the same length and style between the two; brackets: paired p of each against
+       the one to its left.
+    h: the Qwen3-1.7B circuit of two layer-21 key-value heads (edit_heads.py, weights.py, attention_runs.py), drawn by
        Graphviz (circuit_dot.py)."""
     import circuit_dot
     top = y0 + ROWS[2]
-    qs = [q for q in explainer_questions(npz, other) if saved_logp(q[1], f"none|{q[3]}")[0] is not None]
+    qs = explainer_questions(npz, other)
     cv.letter(0.1, top - 0.75, "f")
-    cv.S.text(0.9, top - 0.75, "control: a CPU explainer of the same length", fontsize=25, weight="bold", va="center",
-              linespacing=1.15)
-    for x, col, lab in ((1.1, SLATE, "question alone"), (4.1, GOLD, "CPU explainer first"), (7.6, BLUE, "Janus's LLM explainer first")):
-        cv.S.scatter([x], [top - 2.0], s=110, color=col)
-        cv.S.text(x + 0.25, top - 2.0, lab, fontsize=19, color=col, va="center")
-    ax = cv.axes(2.0, y0 + 1.75, 9.6, 6.3)
-    panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
-                       saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (0, 120))
-    ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab.replace("\n", " ", 1) for *_, lab in qs], fontsize=19)
+    cv.S.text(0.9, top - 0.75, "Janus's LLM explainer before the\nquestion: up in Qwen3-1.7B,\ndown in Qwen3-0.6B",
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
+    for yy, col, lab in ((top - 2.25, SLATE, "question alone"), (top - 2.8, BLUE, "Janus's LLM explainer first")):
+        cv.S.scatter([1.1], [yy], s=110, color=col)
+        cv.S.text(1.35, yy, lab, fontsize=19, color=col, va="center")
+    ax = cv.axes(1.9, y0 + 1.6, 5.9, 5.5)
+    panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{qd}")[0], saved_logp(sp, f"none|{q0}")[1])
+                      for sp, _, q0, _, qd, _ in qs], (0, 102))
+    ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
 
-    cv.letter(14.6, top - 0.75, "g")
-    cv.S.text(15.4, top - 0.75, "Qwen3-1.7B: the head circuit", fontsize=25, weight="bold", va="center")
-    image(cv, circuit_dot.render(circuit_dot.qwen_dot(), "figs/circuit_qwen"), 14.8, top - 1.7, 12.8, 9.0, middle=True)
+    qs = [q for q in qs if saved_logp(q[1], f"none|{q[3]}")[0] is not None]
+    cv.letter(8.9, top - 0.75, "g")
+    cv.S.text(9.7, top - 0.75, "control: a CPU explainer\nof the same length", fontsize=25, weight="bold", va="center",
+              linespacing=1.15)
+    for x, yy, col, lab in ((9.9, top - 2.25, SLATE, "question alone"), (13.4, top - 2.25, GOLD, "CPU explainer first"),
+                            (9.9, top - 2.8, BLUE, "Janus's LLM explainer first")):
+        cv.S.scatter([x], [yy], s=110, color=col)
+        cv.S.text(x + 0.25, yy, lab, fontsize=19, color=col, va="center")
+    ax = cv.axes(10.4, y0 + 1.6, 7.7, 5.5)
+    panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
+                       saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (0, 120))
+    ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
+    ax.tick_params(axis="x", length=0)
+    ax.set_yticks([10, 30, 50, 70, 90])
+
+    cv.letter(18.9, top - 0.75, "h")
+    cv.S.text(19.7, top - 0.75, "Qwen3-1.7B: the head circuit", fontsize=25, weight="bold", va="center")
+    image(cv, circuit_dot.render(circuit_dot.qwen_dot(), "figs/circuit_qwen"), 18.9, top - 1.6, 9.0, 9.2, middle=True)
 
 
 def row_fourlayer(cv, refits, parts, y0):
-    """Panels h-i, occupying [y0, y0 + ROWS[3]].
-    h: Goodfire's 4-layer model, the fewest VPD subcomponents that make the hidden word the top answer: for each K, the
+    """Panels i-j, occupying [y0, y0 + ROWS[3]].
+    i: Goodfire's 4-layer model, the fewest VPD subcomponents that make the hidden word the top answer: for each K, the
        scales of only the K largest subcomponents of a fitted edit fitted again on the training templates; on held-out
        templates, how often the hidden word is the model's first choice among the 50 words, against K, colored by KL on
        held-out Pile text (fourlayer/optimize_edit.py --support).
-    i: the recall circuit, two attention steps and the VPD subcomponents measured to switch them on or off
+    j: the recall circuit, two attention steps and the VPD subcomponents measured to switch them on or off
        (fourlayer/attention_gates.py, subcomponent_circuit.py), drawn by Graphviz."""
     import circuit_dot
     top = y0 + ROWS[3]
@@ -520,7 +542,7 @@ def row_fourlayer(cv, refits, parts, y0):
     kl = np.array([m["pile_kl"] for _, m in rows])
     k90 = next(k for k, t in zip(ks, t1) if t >= 0.9 * max(t1))           # the fewest that reach 90% of the best
     t90 = t1[ks.index(k90)]
-    cv.letter(0.1, top - 0.75, "h")
+    cv.letter(0.1, top - 0.75, "i")
     cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: rescaling {k90}\nVPD subcomponents makes the hidden word\n"
               f"the top answer {t90:.0f}% of the time (from {base:.0f}%)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
@@ -543,7 +565,7 @@ def row_fourlayer(cv, refits, parts, y0):
     if not parts or not os.path.exists(parts):
         return
     g = json.load(open(parts))
-    cv.letter(10.4, top - 0.75, "i")
+    cv.letter(10.4, top - 0.75, "j")
     stress = json.load(open(os.path.join(os.path.dirname(parts), "stress_circuit.json")))
     share = 1 - stress["routes"]["circuit blocked"]["raise"] / stress["unedited"]["raise"]    # blocking both steps
     cv.S.text(11.2, top - 0.75, f"Goodfire 4-layer model: the attention route behind {100 * share:.0f}% of recall",
