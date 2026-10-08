@@ -108,8 +108,8 @@ def qwen_dot():
   edge [fontname="{FONT}", fontsize=16, fontcolor="{SLATE}"];
   {{ rank=same; reply [label="reply “I understand.”\\n(its cache kept from turn 1;\\nthe “.” holds the hidden animal)", {token}];
     question [label="the question\\n“Which animal did you choose?”", {token}]; }}
-  {{ rank=same; h0 [label="layer 21, head 0\ncopies the hidden animal", style="rounded,filled,bold", fillcolor="{PALE_BLUE}", color="{BLUE}", fontcolor="{INK}", penwidth=2.6];
-    h6 [label="layer 21, head 6\nwrites the hidden animal's opposite", style="rounded,filled,bold", fillcolor="#fbe3dc", color="{CORAL}", fontcolor="{INK}", penwidth=2.6]; }}
+  {{ rank=same; h0 [label="layer 21, key-value head 0\ncopies the hidden animal", style="rounded,filled,bold", fillcolor="{PALE_BLUE}", color="{BLUE}", fontcolor="{INK}", penwidth=2.6];
+    h6 [label="layer 21, key-value head 6\nwrites the hidden animal's opposite", style="rounded,filled,bold", fillcolor="#fbe3dc", color="{CORAL}", fontcolor="{INK}", penwidth=2.6]; }}
   answer [label="answer", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=21];
   reply -> h0 [color="{CLOUD}", style=dashed, penwidth=2.2, label=" reads"];
   reply -> h6 [color="{CLOUD}", style=dashed, penwidth=2.2, label=" reads"];

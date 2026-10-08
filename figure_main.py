@@ -361,15 +361,15 @@ def paired_legend(cv, x, y, left, right):
     cv.S.text(x2 + 0.25, y, right, fontsize=20, color=BLUE, va="center")
 
 
-def row_head(cv, y0, flip_groups, npz):
+def row_head(cv, y0, flip_groups, npz, with_cpu=False):
     """Panels c-e, Qwen3-1.7B, occupying [y0, y0 + ROWS[1]].
     c: layer 21 head 6 switched off on several datasets, other heads as controls (edit_heads.py)
     d: per hidden animal, each question, original model and head 21.6 switched off (edit_heads.py --save-logp)
-    e: per hidden animal, each question alone, after a CPU explainer of the same length and style, and after Janus's
-       LLM explainer (edit_heads.py --question)"""
+    e: per hidden animal, each question alone and after Janus's LLM explainer; with_cpu: also after a CPU explainer of
+       the same length and style, between the two (edit_heads.py --question)"""
     top = y0 + ROWS[1]
     cv.letter(0.1, top - 0.75, "c")
-    cv.S.text(0.9, top - 0.75, "Qwen3-1.7B: switching off one attention\nhead (layer 21, head 6) raises\nintrospection, across datasets",
+    cv.S.text(0.9, top - 0.75, "Qwen3-1.7B: switching off one key-value\nhead (layer 21, head 6) raises\nintrospection, across datasets",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     cv.S.scatter([1.1], [top - 2.35], s=110, color=SLATE)
     cv.S.text(1.35, top - 2.35, "original model", fontsize=20, color=SLATE, va="center")
@@ -384,7 +384,7 @@ def row_head(cv, y0, flip_groups, npz):
     cv.S.text(11.6, top - 2.45, "each dot: one hidden animal; lines join the same animal", fontsize=18, color=SLATE, va="center")
     edited = all(saved_logp(npz, f"21:6*0|{q}")[0] is not None for q in ("retained", "recall_B", "neutral"))
     qs = [("retained", "\u201cWhich\nanimal did\nyou choose?\u201d"), ("recall_B", "\u201cRecall,\nintrospect, or\nreconstruct\u2026\u201d"),
-          ("neutral", "control question:\n\u201cName any\nanimal\u201d")]
+          ("neutral", "control:\n\u201cName one\nanimal\u2026\u201d")]
     ax = cv.axes(12.9, y0 + 2.6, 5.6, 5.9)
     panel_paired(ax, [(saved_logp(npz, f"none|{q}")[0], saved_logp(npz, f"21:6*0|{q}")[0] if edited else None,
                        saved_logp(npz, f"none|{q}")[1]) for q, _ in qs], (15, 102))
@@ -394,25 +394,34 @@ def row_head(cv, y0, flip_groups, npz):
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
 
     cv.letter(19.0, top - 0.75, "e")
-    cv.S.text(19.8, top - 0.75, "an unrelated document moves recall\nas much as Janus's LLM explainer\n(Qwen3-1.7B) or more (Qwen3-0.6B)",
-              fontsize=25, weight="bold", va="center", linespacing=1.15)
-    for i, (col, lab) in enumerate(((SLATE, "question alone"), (GOLD, "CPU explainer of the same length first"),
-                                    (BLUE, "Janus's LLM explainer first"))):
-        x = 20.0 + (0, 2.85, 0)[i]
-        y = top - 2.05 - (0, 0, 0.5)[i]
-        cv.S.scatter([x], [y], s=110, color=col)
-        cv.S.text(x + 0.25, y, lab, fontsize=19, color=col, va="center")
-    cpu = "results/q17A/q17A_cpu.npz+results/q17A/q17A_cpu_set2.npz"
-    other, other_cpu = "results/q06A/q06A_questions.npz", "results/q06A/q06A_cpu.npz"
+    other = "results/q06A/q06A_questions.npz"
+    cpu, other_cpu = "results/q17A/q17A_cpu.npz+results/q17A/q17A_cpu_set2.npz", "results/q06A/q06A_cpu.npz"
     qs = [(npz, cpu, "retained", "cpu_A", "doc_A", "1.7B:\n\u201cWhich\nanimal\u2026?\u201d"),
           (npz, cpu, "recall_B", "cpu_B", "doc_B", "1.7B:\n\u201cRecall,\nintrospect\u2026\u201d"),
-          (npz, cpu, "neutral", "cpu_neutral", "doc_neutral", "1.7B, control:\n\u201cName any\nanimal\u201d"),
+          (npz, cpu, "neutral", "cpu_neutral", "doc_neutral", "1.7B control:\n\u201cName one\nanimal\u2026\u201d"),
           (other, other_cpu, "retained", "cpu_A", "doc_A", "0.6B:\n\u201cWhich\nanimal\u2026?\u201d")]
-    qs = [q for q in qs if saved_logp(q[1], f"none|{q[3]}")[0] is not None and saved_logp(q[0], f"none|{q[4]}")[0] is not None]
+    qs = [q for q in qs if saved_logp(q[0], f"none|{q[4]}")[0] is not None]
     ax = cv.axes(20.9, y0 + 2.6, 5.75, 5.5)
-    panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
-                       saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (5, 120))
-    ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
+    if with_cpu:
+        cv.S.text(19.8, top - 0.75, "Qwen3-1.7B: a CPU explainer in the same\nstyle raises recall as much as Janus's;\nQwen3-0.6B: both lower it, Janus's less",
+                  fontsize=25, weight="bold", va="center", linespacing=1.15)
+        for i, (col, lab) in enumerate(((SLATE, "question alone"), (GOLD, "CPU explainer (same length, style) first"),
+                                        (BLUE, "Janus's LLM explainer first"))):
+            x = 20.0 + (0, 2.85, 0)[i]
+            y = top - 2.05 - (0, 0, 0.5)[i]
+            cv.S.scatter([x], [y], s=110, color=col)
+            cv.S.text(x + 0.25, y, lab, fontsize=19, color=col, va="center")
+        qs = [q for q in qs if saved_logp(q[1], f"none|{q[3]}")[0] is not None]
+        panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
+                           saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (5, 120))
+        ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
+    else:
+        cv.S.text(19.8, top - 0.75, "Janus's LLM explainer before the question:\nraises recall of the hidden animal in\nQwen3-1.7B, lowers it in Qwen3-0.6B",
+                  fontsize=25, weight="bold", va="center", linespacing=1.15)
+        paired_legend(cv, 20.0, top - 2.35, "question alone", "Janus's LLM explainer, then the question")
+        panel_paired(ax, [(saved_logp(sp, f"none|{q0}")[0], saved_logp(sp, f"none|{qd}")[0], saved_logp(sp, f"none|{q0}")[1])
+                          for sp, _, q0, _, qd, _ in qs], (5, 102))
+        ax.set_xticks([3 * k + 0.6 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
     ax.set_ylabel("hidden animal ranked above\nanother animal (%)")
     ax.tick_params(axis="x", length=0)
     ax.set_yticks([10, 30, 50, 70, 90])
@@ -531,11 +540,12 @@ def main():
     ap.add_argument("--refit", nargs="+", required=True, help="fourlayer/optimize_edit.py --support outputs")
     ap.add_argument("--parts", default=None, help="fourlayer/attention_gates.py output")
     ap.add_argument("--out", default="figs/main.png")
+    ap.add_argument("--cpu", action="store_true", help="panel e: add the CPU-explainer control between the two conditions")
     a = ap.parse_args()
     fig = plt.figure(figsize=(W, H))
     cv = Canvas(fig)
     row_experiment(cv, a.results, ROWS[1] + ROWS[2] + ROWS[3], a.text4l)
-    row_head(cv, ROWS[2] + ROWS[3], json.load(open(a.flip)), a.questions)
+    row_head(cv, ROWS[2] + ROWS[3], json.load(open(a.flip)), a.questions, a.cpu)
     row_fourlayer(cv, a.refit, ROWS[3])
     row_circuit(cv, a.parts, 0)
     fig.savefig(a.out, dpi=100)

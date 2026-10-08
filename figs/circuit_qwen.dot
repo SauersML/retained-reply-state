@@ -4,9 +4,9 @@ digraph G {
   edge [fontname="Avenir Next", fontsize=16, fontcolor="#8e959c"];
   { rank=same; reply [label="reply “I understand.”\n(its cache kept from turn 1;\nthe “.” holds the hidden animal)", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"];
     question [label="the question\n“Which animal did you choose?”", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"]; }
-  { rank=same; h0 [label="layer 21, head 0
+  { rank=same; h0 [label="layer 21, key-value head 0
 copies the hidden animal", style="rounded,filled,bold", fillcolor="#dce8f6", color="#2f6db5", fontcolor="#1d1d1f", penwidth=2.6];
-    h6 [label="layer 21, head 6
+    h6 [label="layer 21, key-value head 6
 writes the hidden animal's opposite", style="rounded,filled,bold", fillcolor="#fbe3dc", color="#e8684a", fontcolor="#1d1d1f", penwidth=2.6]; }
   answer [label="answer", style="rounded,filled,bold", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f", fontsize=21];
   reply -> h0 [color="#b9bfc6", style=dashed, penwidth=2.2, label=" reads"];
