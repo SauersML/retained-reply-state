@@ -180,11 +180,13 @@ def strip_raise(ax, paths, arm, lim, ticks, pvals):
         if pvals:
             nulls = np.array([raise_of(rng.permutation(present)[np.searchsorted(present, c)]).mean() for _ in range(10000)])
             pv = (1 + np.sum(np.abs(nulls) >= abs(own.mean()))) / 10001
-            p_text(ax, k, lim[1] * 0.985, pv, own.mean())
+            p_text(ax, k, lim[1] * 0.95, pv, own.mean())
     ax.axhline(0, color=SLATE, lw=1.4, ls=(0, (4, 3)), zorder=1)
     ax.set_xlim(-0.55, len(paths) - 0.45)
+    ax.set_yscale("symlog", linthresh=0.05, linscale=0.6)        # log above 0.05 nats, linear through zero
     ax.set_ylim(*lim)
-    ax.set_yticks(ticks)
+    ax.set_yticks(ticks, [f"{t:g}" for t in ticks])
+    ax.minorticks_off()
     ax.set_xticks(range(len(paths)), [])
 
 
@@ -237,7 +239,7 @@ def row_experiment(cv, paths, y0, text4l=None, retained=None):
     specs = {"stripped": ((18, 80), [30, 50, 70], False),
              "retained": ((14, 88), [30, 50, 70], True),
              "visible": ((0, 105), [0, 50, 100], False)}
-    specs4 = {"stripped": ((-1, 7.5), [0, 5], False), "retained": ((-1, 7.5), [0, 5], True), "visible": ((-1, 7.5), [0, 5], False)}
+    specs4 = {k: ((-3, 16), [0, 0.1, 1, 10], k == "retained") for k in ("stripped", "retained", "visible")}
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
     arrows = {"stripped": (51, 78, BLUE, "toward"), "visible": (49, 6, CORAL, "away")}
     for (name, _), y in zip(rows, ys):
