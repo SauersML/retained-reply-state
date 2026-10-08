@@ -110,7 +110,7 @@ def qwen_dot():
     how much the suppressing head reads."""
     token = f'style="rounded,filled", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}"'
     return f"""digraph G {{
-  rankdir=BT; splines=spline; nodesep=0.55; ranksep=1.15; bgcolor="white"; pad=0.2;
+  rankdir=BT; splines=spline; nodesep=0.55; ranksep=1.9; bgcolor="white"; pad=0.2;
   node [shape=box, fontname="{FONT}", fontsize=19, margin="0.2,0.1"];
   edge [fontname="{FONT}", fontsize=16, fontcolor="{SLATE}"];
   {{ rank=same; reply [label="reply “I understand.”\\n(its cache kept from turn 1;\\nthe “.” holds the hidden animal)", {token}];

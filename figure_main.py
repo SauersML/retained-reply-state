@@ -38,7 +38,7 @@ plt.rcParams.update({"font.family": "Avenir Next", "font.size": 26, "figure.face
                      "axes.facecolor": "white", "axes.spines.top": False, "axes.spines.right": False,
                      "axes.linewidth": 1.6, "xtick.major.width": 1.6, "ytick.major.width": 1.6})
 W = 28.0                                   # figure width in drawing units (inches)
-ROWS = [14.5, 11.5, 11.5, 11.5, 12.0]      # heights of the five rows
+ROWS = [13.3, 11.5, 11.5, 11.5, 15.8]      # heights of the five rows
 H = sum(ROWS)
 
 
@@ -198,12 +198,12 @@ def row_experiment(cv, paths, y0, text4l=None, retained=None):
     top = y0 + ROWS[0]
     cv.letter(0.1, top - 0.95, "a")
     cv.S.text(0.9, top - 0.95, "turn 1", fontsize=32, weight="bold", va="center")
-    cv.block(0.9, top - 2.75, 3.3, h, PALE_SLATE, "none", "pick an animal\nin your thinking", fs=20)
-    cv.block(4.4, top - 2.75, 4.9, h, PALE_CORAL, CORAL, "thinking:  …otter…", fs=25)
+    cv.block(0.9, top - 2.65, 3.3, h, PALE_SLATE, "none", "pick an animal\nin your thinking", fs=20)
+    cv.block(4.4, top - 2.65, 4.9, h, PALE_CORAL, CORAL, "thinking:  …otter…", fs=25)
     cv.S.text(6.85, top - 1.4, "we write a random animal here", ha="center", fontsize=21, color=CORAL, style="italic")
-    cv.block(9.5, top - 2.75, 3.4, h, PALE_BLUE, BLUE, "I understand.", fs=25)
+    cv.block(9.5, top - 2.65, 3.4, h, PALE_BLUE, BLUE, "I understand.", fs=25)
     cv.S.text(11.2, top - 1.4, "the model writes this", ha="center", fontsize=21, color=BLUE, style="italic")
-    cv.S.text(0.9, top - 4.25, "turn 2", fontsize=32, weight="bold", va="center")
+    cv.S.text(0.9, top - 3.85, "turn 2", fontsize=32, weight="bold", va="center")
     rows = [("stripped", SLATE), ("retained", BLUE), ("visible", CORAL)]
     ys = [y0 + 8.0, y0 + 5.0, y0 + 2.0]
     for (name, col), y in zip(rows, ys):
@@ -507,13 +507,12 @@ def row_controls(cv, y0, npz, other):
 
     qs = [q for q in qs if saved_logp(q[1], f"none|{q[3]}")[0] is not None]
     cv.letter(8.9, top - 0.75, "g")
-    cv.S.text(9.7, top - 0.75, "control: a CPU explainer\nof the same length", fontsize=25, weight="bold", va="center",
-              linespacing=1.15)
-    for x, yy, col, lab in ((9.9, top - 2.25, SLATE, "question alone"), (13.4, top - 2.25, GOLD, "CPU explainer first"),
-                            (9.9, top - 2.8, BLUE, "Janus's LLM explainer first")):
+    cv.S.text(9.7, top - 0.75, "control: a CPU explainer of the same length", fontsize=25, weight="bold", va="center")
+    for x, yy, col, lab in ((9.9, top - 1.65, SLATE, "question alone"), (13.4, top - 1.65, GOLD, "CPU explainer first"),
+                            (9.9, top - 2.2, BLUE, "Janus's LLM explainer first")):
         cv.S.scatter([x], [yy], s=110, color=col)
         cv.S.text(x + 0.25, yy, lab, fontsize=19, color=col, va="center")
-    ax = cv.axes(10.4, y0 + 1.6, 7.7, ROWS[2] - 4.9)
+    ax = cv.axes(10.4, y0 + 1.6, 7.7, ROWS[2] - 4.3)
     panel_triple(ax, [((saved_logp(sp, f"none|{q0}")[0], saved_logp(cp, f"none|{qc}")[0], saved_logp(sp, f"none|{qd}")[0]),
                        saved_logp(sp, f"none|{q0}")[1]) for sp, cp, q0, qc, qd, _ in qs], (0, 120))
     ax.set_xticks([4 * k + 1.15 for k in range(len(qs))], [lab for *_, lab in qs], fontsize=16)
@@ -596,9 +595,9 @@ def text_schematic(cv, x0, top):
                    arrowprops=dict(arrowstyle="-|>", color=INK, lw=2.5, mutation_scale=24))
         S.text(x0 + 14.9, y + h / 2, "?", fontsize=24, va="center", color=INK, weight="bold")
         wx = xs["word"][0] + xs["word"][1] / 2
-        arc(wx, xs["later"][0] + xs["later"][1] / 2, y + h + 0.05, later_ok, -0.45)
-        arc(wx, xs["cue"][0] + xs["cue"][1] / 2, y + h + 0.05, cue_ok, -0.3)
-    ky = top - 3.3 - 2.55 * 3 + 1.0
+        arc(xs["word"][0] + xs["word"][1] - 0.15, xs["later"][0] + 1.3, y + h + 0.05, later_ok, -0.5)
+        arc(wx - 0.2, xs["cue"][0] + xs["cue"][1] / 2, y + h + 0.05, cue_ok, -0.33)
+    ky = top - 3.3 - 2.55 * 2 - 1.0
     S.annotate("", xy=(x0 + 4.9, ky), xytext=(x0 + 3.7, ky), arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=3, mutation_scale=22))
     S.text(x0 + 5.1, ky, "the token reads the word", fontsize=19, color=BLUE, va="center")
     S.plot([x0 + 9.4, x0 + 10.6], [ky, ky], color=CORAL, lw=3, ls=(0, (3, 2)))
@@ -621,31 +620,31 @@ def row_circuit(cv, parts, y0):
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     key(cv, 1.2, top - 1.8)
     image(cv, circuit_dot.render(*circuit_dot.gates_dot(g)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g)[1]),
-          0.6, top - 2.75, 26.8, ROWS[4] - 3.0)
+          0.9, top - 2.75, 26.4, ROWS[4] - 3.0)
 
 
 def key(cv, x, y):
     """Visual key of the circuit diagrams: wire kinds and widths."""
     S = cv.S
     S.annotate("", xy=(x + 0.9, y), xytext=(x, y), arrowprops=dict(arrowstyle="-|>", lw=3.5, color=BLUE, mutation_scale=22))
-    S.text(x + 1.05, y, "needed for recall", fontsize=22, color=BLUE, va="center")
+    S.text(x + 1.05, y, "needed for recall", fontsize=26, color=BLUE, va="center")
     x2 = x + 4.1
     S.plot([x2, x2 + 0.85], [y, y], color=CORAL, lw=3.5, solid_capstyle="butt")
     S.plot([x2 + 0.85, x2 + 0.85], [y - 0.17, y + 0.17], color=CORAL, lw=4.5, solid_capstyle="butt")
-    S.text(x2 + 1.05, y, "holds recall back", fontsize=22, color=CORAL, va="center")
+    S.text(x2 + 1.05, y, "holds recall back", fontsize=26, color=CORAL, va="center")
     x3 = x2 + 4.1
     S.annotate("", xy=(x3 + 0.9, y), xytext=(x3, y), arrowprops=dict(arrowstyle="-|>", lw=2, color=CLOUD,
                ls=(0, (4, 2)), mutation_scale=16))
-    S.text(x3 + 1.05, y, "input from that token", fontsize=22, color=SLATE, va="center")
+    S.text(x3 + 1.05, y, "input from that token", fontsize=26, color=SLATE, va="center")
     y2 = y - 0.6
     S.annotate("", xy=(x + 0.9, y2), xytext=(x, y2), arrowprops=dict(arrowstyle="-|>", lw=1.5, color=BLUE, mutation_scale=16))
-    S.text(x + 1.05, y2, "small effect", fontsize=20, color=SLATE, va="center")
+    S.text(x + 1.05, y2, "small effect", fontsize=23, color=SLATE, va="center")
     S.annotate("", xy=(x2 + 0.9, y2), xytext=(x2, y2), arrowprops=dict(arrowstyle="-|>", lw=6, color=BLUE, mutation_scale=26))
-    S.text(x2 + 1.05, y2, "large effect", fontsize=20, color=SLATE, va="center")
+    S.text(x2 + 1.05, y2, "large effect", fontsize=23, color=SLATE, va="center")
     for dy in (-0.12, -0.04, 0.04, 0.12):
         S.annotate("", xy=(x3 + 0.9, y2 + dy), xytext=(x3, y2 + dy), arrowprops=dict(arrowstyle="-|>", lw=0.8, color=SLATE,
                    mutation_scale=7))
-    S.text(x3 + 1.05, y2, "the word's identity, spread over\nmany value subcomponents", fontsize=19, color=SLATE, va="center",
+    S.text(x3 + 1.05, y2, "the word's identity, spread over\nmany value subcomponents", fontsize=22, color=SLATE, va="center",
            linespacing=1.0)
 
 

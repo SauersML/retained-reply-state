@@ -1,5 +1,5 @@
 digraph G {
-  rankdir=BT; splines=spline; nodesep=0.55; ranksep=1.15; bgcolor="white"; pad=0.2;
+  rankdir=BT; splines=spline; nodesep=0.55; ranksep=1.9; bgcolor="white"; pad=0.2;
   node [shape=box, fontname="Avenir Next", fontsize=19, margin="0.2,0.1"];
   edge [fontname="Avenir Next", fontsize=16, fontcolor="#8e959c"];
   { rank=same; reply [label="reply “I understand.”\n(its cache kept from turn 1;\nthe “.” holds the hidden animal)", style="rounded,filled", fillcolor="#eceef0", color="#eceef0", fontcolor="#1d1d1f"];
