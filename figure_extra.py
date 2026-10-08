@@ -6,7 +6,9 @@ documents_head   Qwen3-1.7B, held-out runs: for each question, the hidden animal
                  animals; p: sign flips of each run's paired change in the hidden animal's centered log P.
 wording          the same for minimal edits between the plain and the introspective recall question (wording.py)
 attention        head 21.6's attention to the reply under each question, against the recall it gives (attention_runs.py)
-usage: figure_extra.py documents_head|wording|attention
+flow             Goodfire's 4-layer model: for each layer and position, how much of the hidden word's raise is lost when
+                 that block's attention or MLP output is set to its mean over the template's words (mlp_routes.py)
+usage: figure_extra.py documents_head|wording|attention|flow
 """
 import json
 import os
@@ -72,5 +74,34 @@ def documents_head(out="figs/documents_head.png"):
     fig.savefig(out, dpi=110, facecolor="white")
 
 
+def flow(out="figs/flow4l.png"):
+    from matplotlib.colors import LinearSegmentedColormap
+    r = json.load(open("results/fourlayer/mlp_routes.json"))["blocks"]
+    cols = [("word", "hidden word\n\u201cfox\u201d"), ("later", "later tokens\n\u201c. Nobody else knows.\u201d"),
+            ("cue", "where it is recalled\n\u201cMy pet is a\u201d")]
+    cmap = LinearSegmentedColormap.from_list("lost", ["white", "#c9dbf0", BLUE, INK])
+    fig, axes = plt.subplots(1, 2, figsize=(17, 7.6))
+    fig.subplots_adjust(left=0.08, right=0.86, bottom=0.2, top=0.82, wspace=0.08)
+    for ax, (kind, name) in zip(axes, (("attn", "attention output"), ("mlp", "MLP output"))):
+        M = np.array([[max(0.0, -100 * r[f"{l}.{kind}@{c}"]["raise"]) for c, _ in cols] for l in range(4)])
+        im = ax.imshow(M, cmap=cmap, vmin=0, vmax=100, aspect="auto", origin="lower")
+        for l in range(4):
+            for j in range(3):
+                v = M[l, j]
+                ax.text(j, l, f"\u2212{v:.0f}%" if v >= 0.5 else "0", ha="center", va="center", fontsize=21,
+                        color="white" if v > 55 else INK)
+        ax.set_xticks(range(3), [lab for _, lab in cols], fontsize=17)
+        ax.set_yticks(range(4), [f"layer {l}" for l in range(4)] if kind == "attn" else [""] * 4, fontsize=19)
+        ax.set_title(name, fontsize=22, pad=12)
+        ax.tick_params(length=0)
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+    cb = fig.colorbar(im, cax=fig.add_axes([0.88, 0.2, 0.015, 0.62]))
+    cb.set_label("recall lost without the block's\nword-specific output (%)", fontsize=17)
+    cb.outline.set_visible(False)
+    fig.text(0.08, 0.93, "Goodfire 4-layer model: where the hidden word's information flows", fontsize=24, weight="bold")
+    fig.savefig(out, dpi=110, facecolor="white")
+
+
 if __name__ == "__main__":
-    {"documents_head": documents_head}[sys.argv[1]]()
+    {"documents_head": documents_head, "flow": flow}[sys.argv[1]]()
