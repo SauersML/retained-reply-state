@@ -553,8 +553,8 @@ I_TITLE = ("Goodfire 4-layer model: rescaling {k}\nVPD subcomponents makes the h
            "the top answer {top:.0f}% of the time (from {base:.0f}%)")
 
 
-def row_fourlayer(cv, refits, y0, x0=0.0, rh=ROWS[3], letter="i", title=I_TITLE):
-    """Panel i, at x0 in the row [y0, y0 + rh].
+def row_fourlayer(cv, refits, y0, x0=0.0, rh=ROWS[3], letter="i", title=I_TITLE, pw=9.6):
+    """Panel i, at x0 in the row [y0, y0 + rh], its plot pw wide.
     i: Goodfire's 4-layer model, the fewest VPD subcomponents that make the hidden word the top answer: for each K, the
        scales of only the K largest subcomponents of a fitted edit fitted again on the training templates; on held-out
        templates, how often the hidden word is the model's first choice among the 50 words, against K, colored by KL on
@@ -573,11 +573,11 @@ def row_fourlayer(cv, refits, y0, x0=0.0, rh=ROWS[3], letter="i", title=I_TITLE)
     cv.letter(x0 + 0.1, top - 0.75, letter)
     cv.S.text(x0 + 0.9, top - 0.75, title.format(k=k90, top=t90, base=base),
               fontsize=25, weight="bold", va="center", linespacing=1.15)
-    ax = cv.axes(x0 + 2.4, y0 + 1.6, 9.6, rh - 3.9)
+    ax = cv.axes(x0 + 2.4, y0 + 1.6, pw, rh - 3.9)
     ax.plot(ks, t1, "-", color=CLOUD, lw=2.5, zorder=2)
     sc = ax.scatter(ks, t1, c=kl, cmap=LinearSegmentedColormap.from_list("kl", ["#d6e4f5", BLUE, INK]),
                     vmin=0, vmax=max(0.05, float(kl.max())), s=110, edgecolor="white", lw=1.2, zorder=3)
-    cb = cv.fig.colorbar(sc, cax=cv.axes(x0 + 12.4, y0 + 1.6, 0.22, rh - 3.9))
+    cb = cv.fig.colorbar(sc, cax=cv.axes(x0 + 2.8 + pw, y0 + 1.6, 0.22, rh - 3.9))
     cb.set_label("damage on held-out Pile text\n(KL, nats per token)", fontsize=17)
     cb.ax.tick_params(labelsize=15)
     cb.outline.set_visible(False)
@@ -753,7 +753,7 @@ def row_circuit(cv, parts, y0, rh=ROWS[5], letter="k", title=K_TITLE):
     key(cv, 1.2, top - 1.8)
     routes = json.load(open(os.path.join(os.path.dirname(parts), "mlp_routes.json")))
     image(cv, circuit_dot.render(*circuit_dot.gates_dot(g, routes)[:1], "figs/circuit_gates", snap=circuit_dot.gates_dot(g, routes)[1]),
-          0.9, top - 3.05, 26.4, rh - 3.2)
+          0.9, top - 3.05, cv.width - 1.6, rh - 3.2)
 
 
 def key(cv, x, y):
