@@ -498,14 +498,17 @@ def row_controls(cv, y0, npz, other):
     qs = explainer_questions(npz, other)
     labels = [lab for *_, lab in qs]
     cv.letter(0.1, top - 0.75, "f")
-    def no_change(spec):
-        """True when Janus's explainer leaves the recall question unchanged (paired test, p >= 0.05)."""
+    def direction(spec):
+        """Janus's explainer before the plain recall question: "up", "down" or "no change" (paired test, p < 0.05)."""
         (L0, c), (L1, _) = saved_logp(spec, "none|retained"), saved_logp(spec, "none|doc_A")
-        return p_paired(centred_logp(L1, c) - centred_logp(L0, c), np.random.default_rng(0)) >= 0.05
-    flat = [m for m, f in (("4B", "results/fp32/expl_4b.npz"), ("8B", "results/fp32/expl_8b.npz+results/fp32/expl_8b_set2.npz"))
-            if os.path.exists(f.split("+")[0]) and no_change(f)]
-    cv.S.text(0.9, top - 0.75, "Janus's LLM explainer before the question: up in Qwen3-1.7B\nwith the plain question, down in Qwen3-0.6B"
-              + (f", no change in {' or '.join(flat)}" if flat else ""), fontsize=25, weight="bold", va="center", linespacing=1.15)
+        d = centred_logp(L1, c) - centred_logp(L0, c)
+        return "no change" if p_paired(d, np.random.default_rng(0)) >= 0.05 else ("up" if d.mean() > 0 else "down")
+    models = [("Qwen3-0.6B", other), ("Qwen3-1.7B", npz), ("4B", "results/fp32/expl_4b.npz"),
+              ("8B", "results/fp32/expl_8b.npz+results/fp32/expl_8b_set2.npz")]
+    seen = {m: direction(sp) for m, sp in models if os.path.exists(sp.split("+")[0])}
+    parts = [f"{d} in {' and '.join(m for m in seen if seen[m] == d)}" for d in ("up", "down", "no change") if d in seen.values()]
+    cv.S.text(0.9, top - 0.75, "Janus's LLM explainer before the plain question:\n" + ", ".join(parts),
+              fontsize=25, weight="bold", va="center", linespacing=1.15)
     for x, col, lab in ((1.1, SLATE, "question alone"), (4.3, BLUE, "Janus's LLM explainer first")):
         cv.S.scatter([x], [top - 2.0], s=110, color=col)
         cv.S.text(x + 0.25, top - 2.0, lab, fontsize=19, color=col, va="center")

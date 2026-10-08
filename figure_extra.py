@@ -182,5 +182,32 @@ def wording(out="figs/wording.png", word="results/fp32/wording_heldout_mac.npz",
     fig.savefig(out, dpi=110, facecolor="white")
 
 
+def runs(out="figs/head216_runs.png", att="results/fp32/attention_all.npz"):
+    """Per run (held-out Qwen3-1.7B runs): the change in head 21.6's attention to the reply between the plain and the
+    introspective question, against the change in the hidden animal's log P (each relative to that animal's mean over
+    runs); line: mean log P change in deciles of the attention change."""
+    from scipy.stats import spearmanr
+    z = np.load(att)
+    g = int(z["group"])
+    a = lambda k: 100 * z[k][:, 0, 6 * g:7 * g].mean(1)
+    L0, c = saved_logp(HELD, "none|retained")
+    L1, _ = saved_logp(HELD, "none|recall_B")
+    dx, dy = a("B") - a("A"), centred_logp(L1, c) - centred_logp(L0, c)
+    fig, ax = plt.subplots(figsize=(12, 8.4))
+    fig.subplots_adjust(left=0.15, right=0.97, bottom=0.17, top=0.8)
+    ax.scatter(dx, dy, s=26, color=BLUE, alpha=0.45, edgecolor="none")
+    edges = np.percentile(dx, np.linspace(0, 100, 11))
+    mids = [(dx[(dx >= lo) & (dx <= hi)].mean(), dy[(dx >= lo) & (dx <= hi)].mean()) for lo, hi in zip(edges[:-1], edges[1:])]
+    ax.plot(*zip(*mids), "-o", color=INK, lw=3, ms=8)
+    ax.axhline(0, color=SLATE, lw=1.3, ls=(0, (4, 3)))
+    ax.set_xlabel("change in head 21.6's attention to the reply\n(percentage points)", fontsize=19)
+    ax.set_ylabel("change in the hidden animal's log P (nats)", fontsize=19)
+    rho = spearmanr(dx, dy).correlation
+    fig.text(0.03, 0.91, f"Qwen3-1.7B, run by run: the more the introspective question lowers head 21.6's attention\n"
+             f"to the reply, the more it raises the hidden animal (rank correlation {rho:.2f}, 599 runs)", fontsize=19,
+             weight="bold", va="center")
+    fig.savefig(out, dpi=110, facecolor="white")
+
+
 if __name__ == "__main__":
-    {"documents_head": documents_head, "flow": flow, "wording": wording}[sys.argv[1]]()
+    {"documents_head": documents_head, "flow": flow, "wording": wording, "runs": runs}[sys.argv[1]]()
