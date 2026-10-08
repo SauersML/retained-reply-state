@@ -47,7 +47,8 @@ def main():
             ("results/q17B/q17b_div_B.json", ["--arms", "retained,neutral", "--edits", "21:6*0"], "q17B_wordingB"),
         ],
         "other": [
-            ("results/qwen3_0.6b.json", ["--arms", "retained,neutral", "--edits", "21:6*0", "--save-logp"] + qargs, "q06A"),
+            ("results/qwen3_0.6b.json", ["--arms", "retained,neutral", "--save-logp"] + qargs, "q06A"),
+            ("results/qwen3_0.6b.json", ["--arms", "retained", "--edits", "21:6*0"], "q06A_head"),
             ("results/qwen3_4b.json", ["--arms", "retained", "--save-logp"], "q4A_set1"),
             ("results/q4A/q4A_more.json", ["--arms", "retained", "--save-logp"], "q4A_set2"),
             ("results/qwen3_8b.json", ["--arms", "retained", "--save-logp"], "q8A_set1"),

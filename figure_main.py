@@ -207,7 +207,7 @@ def row_experiment(cv, paths, y0, text4l=None, retained=None):
     cv.S.add_patch(plt.Rectangle((22.0, top - 1.95), 0.4, 0.4, facecolor=CLOUD, edgecolor="none"))
     cv.S.text(22.6, top - 1.75, "another animal was hidden", fontsize=22, color=SLATE, va="center")
     specs = {"stripped": ((18, 80), [30, 50, 70], False),
-             "retained": ((18, 80), [30, 50, 70], True),
+             "retained": ((14, 88), [30, 50, 70], True),
              "visible": ((0, 105), [0, 50, 100], False)}
     specs4 = dict(specs, retained=((0, 130), [0, 50, 100], True))
     # direction: an up arrow above zero on the top plot, a down arrow below zero on the bottom plot
