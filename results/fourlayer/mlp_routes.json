@@ -297,5 +297,12 @@
    "raise": -0.009000000000000001
   }
  },
- "note": "parts: the screen of layer 0's MLP at the word (30 c_fc and 22 down_proj subcomponents with the largest |x.v| there, each set to its template mean alone); stopped before the other MLP blocks were screened"
+ "note": "parts: the screen of layer 0's MLP at the word (30 c_fc and 22 down_proj subcomponents with the largest |x.v| there, each set to its template mean alone); stopped before the other MLP blocks were screened",
+ "combos": {
+  "0.attn@later,0.mlp@later,1.attn@later": {
+   "raise": -0.40710666128447903,
+   "att_2_3": 0.019465638034675603,
+   "att_3_45": -0.007232325259902472
+  }
+ }
 }

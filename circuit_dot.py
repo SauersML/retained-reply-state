@@ -55,8 +55,8 @@ def gates_dot(g, routes):
     """Parts named by layer, matrix and position: every query or key subcomponent whose removal moves the hidden word's
     raise (its log P relative to its mean within the template) by at least 10% (fourlayer/attention_gates.py); a part
     of two subcomponents takes the larger effect.  Wire width grows with that change.  The stages that carry the word
-    (fourlayer/mlp_routes.py, routes): each labeled with the share of the raise its word-specific output carries (the
-    output set to its mean over the template's words).
+    (fourlayer/mlp_routes.py, routes): each labeled with the change in the raise when its word-specific output is
+    removed (set to its mean over the template's words), alone; the stages are in series, so these do not add.
     Returns the dot source and the bundles' (label node, tail, head) for render(snap=...)."""
     eff = {k: 100 * v["raise_change_share"] for k, v in g["gates"].items()}
     missing = [k for k in DRAWN if k not in eff]
@@ -69,7 +69,8 @@ def gates_dot(g, routes):
     part = f'style="rounded,filled", fillcolor="white", penwidth=2.2'
     head = f'style="rounded,filled,bold", fillcolor="{PALE_BLUE}", color="{BLUE}", fontcolor="{INK}", fontsize=40, penwidth=2.6'
 
-    share = lambda key: f"{-100 * routes['blocks'][key]['raise']:.0f}%"
+    share = lambda key: f"\u2212{-100 * routes['blocks'][key]['raise']:.0f}%"
+    combo = lambda key: f"\u2212{-100 * routes['combos'][key]['raise']:.0f}%"
     biggest = max(-v["raise"] for v in routes["parts"].values())
     stage = f'style="rounded,filled", fillcolor="white", color="{SLATE}", fontcolor="{INK}", penwidth=2.2'
     snap = []
@@ -95,10 +96,10 @@ def gates_dot(g, routes):
     q3 [label="layer 3 query\nwhere the word\nis recalled", color="{BLUE}", fontcolor="{BLUE}", {part}];
     b3 [label="layer 3 queries\nwhere the word\nis recalled\n(2 subcomponents)", color="{CORAL}", fontcolor="{CORAL}", {part}]; }}
   h3 [label="layer 3, heads 4 and 5\nread the later tokens\nwhere the word is recalled", {head}];
-  m0 [label="layer 0 MLP at the hidden word\nwrites the word's identity\n({share('0.mlp@word')} of recall; spread over many\nsubcomponents, none over {100 * biggest:.0f}% alone)", {stage}];
-  early [label="layers 0-1 attention and layer 0 MLP\nat the later tokens: an earlier copy\n({share('0.attn@later')}, {share('0.mlp@later')}, {share('1.attn@later')} of recall)", {stage}];
-  read2 [label="layer 2 attention\nwhere the word is recalled:\nan earlier read ({share('2.attn@cue')})", {stage}];
-  m3 [label="layer 3 MLP\nwhere the word is recalled\nturns it into the answer\n({share('3.mlp@cue')} of recall)", {stage}];
+  m0 [label="layer 0 MLP at the hidden word\nwrites the word's identity\n(recall {share('0.mlp@word')} without it; spread over\nmany subcomponents, none over {100 * biggest:.0f}% alone)", {stage}];
+  early [label="layers 0-1 at the later tokens:\nan earlier copy of the word\n(recall {combo('0.attn@later,0.mlp@later,1.attn@later')} without it)", {stage}];
+  read2 [label="layer 2 attention\nwhere the word is recalled:\nan earlier read\n(recall {share('2.attn@cue')} without it)", {stage}];
+  m3 [label="layer 3 MLP\nwhere the word is recalled\nturns it into the answer\n(recall {share('3.mlp@cue')} without it)", {stage}];
   answer [label="answer:\n“fox”", style="rounded,filled,bold", fillcolor="{PALE_SLATE}", color="{PALE_SLATE}", fontcolor="{INK}", fontsize=40];
   word -> k2 [{info}]; word -> m0 [{info}]; later -> q2 [{info}]; later -> k3 [{info}]; cue -> q3 [{info}]; cue -> b3 [{info}];
   word -> early [{info}];

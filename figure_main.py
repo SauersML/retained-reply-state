@@ -634,7 +634,7 @@ def row_circuit(cv, parts, y0):
     cv.letter(0.1, top - 0.75, "k")
     stress = json.load(open(os.path.join(os.path.dirname(parts), "stress_circuit.json")))
     share = 1 - stress["routes"]["circuit blocked"]["raise"] / stress["unedited"]["raise"]    # blocking both steps
-    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: the recall circuit (blocking its two main attention steps removes {100 * share:.0f}% of recall)",
+    cv.S.text(0.9, top - 0.75, f"Goodfire 4-layer model: the recall circuit (recall \u2212{100 * share:.0f}% with its two main attention steps blocked)",
               fontsize=25, weight="bold", va="center", linespacing=1.15)
     key(cv, 1.2, top - 1.8)
     routes = json.load(open(os.path.join(os.path.dirname(parts), "mlp_routes.json")))

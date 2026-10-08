@@ -12,7 +12,7 @@ step); heads 3.4 and 3.5 from the last cue token to the later tokens (the read s
   top         the --top parts by effect, also removed outright (output minus (x.v) u); their KL on held-out Pile text
               with the part removed at every position comes from suspects.py
 Each stage can be split over processes: --stage blocks|parts|top --shard K --nshard N writes OUT with .STAGE.K.json;
---stage merge combines the shards.
+--stage merge combines the shards; --stage combo --combo B,... adds several blocks averaged out together to OUT.
 usage: mlp_routes.py --stage blocks --shard 0 --nshard 4 ... then --stage merge --out mlp_routes.json
 """
 import argparse
@@ -38,7 +38,8 @@ def main():
     ap.add_argument("--cands", type=int, default=40, help="candidates per matrix and block")
     ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--out", default=os.path.join(RESULTS, "mlp_routes.json"))
-    ap.add_argument("--stage", default="blocks", choices=["blocks", "parts", "top", "merge"])
+    ap.add_argument("--stage", default="blocks", choices=["blocks", "parts", "top", "merge", "combo"])
+    ap.add_argument("--combo", default="", help="blocks averaged out together, e.g. 0.attn@later,0.mlp@later (stage combo)")
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--nshard", type=int, default=1)
     a = ap.parse_args()
@@ -125,6 +126,15 @@ def main():
                 out["unedited"] = d["unedited"]
                 out[st].update(d[st])
         json.dump(out, open(a.out, "w"), indent=1)
+        return
+    if a.stage == "combo":
+        base = run()
+        spec = [(int(b.split(".")[0]), b.split(".")[1].split("@")[0], b.split("@")[1]) for b in a.combo.split(",")]
+        r = rel(run(block_mean=spec), base)
+        d = json.load(open(a.out))
+        d.setdefault("combos", {})[a.combo] = r
+        json.dump(d, open(a.out, "w"), indent=1)
+        print(f"  {a.combo} together: raise {100 * r['raise']:+.1f}%", flush=True)
         return
     acts = {}
     base = run(acts=acts)
